@@ -143,7 +143,7 @@ const NetworkPage: React.FC = () => {
         .attr('y', (d: any) => d.y);
     });
 
-    return () => sim.stop();
+    return () => { sim.stop(); };
   }, [graph]);
 
   if (loading) return <div className="p-6 text-gray-500 text-sm">Loading network…</div>;
