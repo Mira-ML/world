@@ -97,7 +97,7 @@ const NetworkPage: React.FC = () => {
 
     // Nodes
     const node = g.append('g')
-      .selectAll('circle')
+      .selectAll<SVGCircleElement, typeof nodes[number]>('circle')
       .data(nodes)
       .join('circle')
       .attr('r', 18)
