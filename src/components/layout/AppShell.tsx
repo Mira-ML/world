@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { to: '/prompts', label: 'PROMPTS', end: false },
   { to: '/network', label: 'NETWORK', end: false },
   { to: '/flags', label: 'FEATURE FLAGS', end: false },
+  { to: '/widget-flags', label: 'WIDGET FLAGS', end: false },
   { to: '/cards', label: 'CARDS', end: false },
 ];
 

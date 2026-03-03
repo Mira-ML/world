@@ -4,6 +4,8 @@ import { getApiBaseUrl } from '../config/stage';
 
 interface WorldDataContextValue {
   apiFetch: (path: string, options?: RequestInit) => Promise<any>;
+  /** Fetch any API path without the /world prefix (e.g. /widget?orgId=...) */
+  baseApiFetch: (path: string, options?: RequestInit) => Promise<any>;
 }
 
 const WorldDataContext = createContext<WorldDataContextValue | null>(null);
@@ -11,10 +13,8 @@ const WorldDataContext = createContext<WorldDataContextValue | null>(null);
 export const WorldDataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { getAccessTokenSilently } = useAuth0();
 
-  const apiFetch = useCallback(async (path: string, options: RequestInit = {}) => {
+  const doFetch = useCallback(async (url: string, options: RequestInit = {}) => {
     const token = await getAccessTokenSilently();
-    const base = getApiBaseUrl();
-    const url = `${base}/world${path}`;
     const res = await fetch(url, {
       ...options,
       headers: {
@@ -30,8 +30,14 @@ export const WorldDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return res.json();
   }, [getAccessTokenSilently]);
 
+  const apiFetch = useCallback((path: string, options?: RequestInit) =>
+    doFetch(`${getApiBaseUrl()}/world${path}`, options), [doFetch]);
+
+  const baseApiFetch = useCallback((path: string, options?: RequestInit) =>
+    doFetch(`${getApiBaseUrl()}${path}`, options), [doFetch]);
+
   return (
-    <WorldDataContext.Provider value={{ apiFetch }}>
+    <WorldDataContext.Provider value={{ apiFetch, baseApiFetch }}>
       {children}
     </WorldDataContext.Provider>
   );

@@ -11,6 +11,7 @@ import CostsPage from './pages/Costs/CostsPage';
 import PromptsPage from './pages/Prompts/PromptsPage';
 import NetworkPage from './pages/Network/NetworkPage';
 import FeatureFlagsPage from './pages/FeatureFlags/FeatureFlagsPage';
+import WidgetFlagsPage from './pages/WidgetFlags/WidgetFlagsPage';
 import CardsPage from './pages/Cards/CardsPage';
 
 const App: React.FC = () => (
@@ -26,6 +27,7 @@ const App: React.FC = () => (
               <Route path="prompts" element={<PromptsPage />} />
               <Route path="network" element={<NetworkPage />} />
               <Route path="flags" element={<FeatureFlagsPage />} />
+              <Route path="widget-flags" element={<WidgetFlagsPage />} />
               <Route path="cards" element={<CardsPage />} />
             </Route>
           </Routes>
