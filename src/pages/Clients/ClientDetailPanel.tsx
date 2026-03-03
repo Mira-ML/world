@@ -1,10 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { useWorldData } from '../../contexts/WorldDataContext';
-import { X, Plus } from 'lucide-react';
+import { X, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Flag { flagKey: string; scopeOrg: string; value: string | boolean; updatedAt: string; }
 interface Note { orgId: string; createdAt: string; noteBody: string; createdBy: string; }
-interface ClientDetail { orgId: string; orgName: string; industry?: string; status?: string; notes: Note[]; flags: Flag[]; }
+interface ClientDetail { orgId: string; orgName: string; industry?: string; status?: string; agentId?: string; notes: Note[]; flags: Flag[]; }
+
+interface Integration {
+  key: string;
+  label: string;
+  status: string;
+  details: Record<string, string>;
+}
+
+interface PromptSection {
+  key: string;
+  label: string;
+  description: string;
+  content: string;
+}
+
 interface Props { orgId: string; onClose: () => void; }
 
 const ClientDetailPanel: React.FC<Props> = ({ orgId, onClose }) => {
@@ -14,12 +29,47 @@ const ClientDetailPanel: React.FC<Props> = ({ orgId, onClose }) => {
   const [newNote, setNewNote] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Integrations
+  const [integrations, setIntegrations] = useState<Integration[]>([]);
+  const [integrationsLoading, setIntegrationsLoading] = useState(false);
+
+  // Widget preview
+  const [widgetOpen, setWidgetOpen] = useState(false);
+
+  // Agent prompt
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [promptSections, setPromptSections] = useState<PromptSection[]>([]);
+  const [promptAgentName, setPromptAgentName] = useState('');
+  const [promptLoading, setPromptLoading] = useState(false);
+
   const load = () => {
     setLoading(true);
     apiFetch(`/clients/${orgId}`).then(setDetail).catch(() => {}).finally(() => setLoading(false));
   };
 
-  useEffect(() => { load(); }, [orgId]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    load();
+    // Load integrations
+    setIntegrationsLoading(true);
+    apiFetch(`/clients/${orgId}/integrations`)
+      .then(d => setIntegrations(d.integrations ?? []))
+      .catch(() => {})
+      .finally(() => setIntegrationsLoading(false));
+  }, [orgId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load prompt data lazily when expanded
+  useEffect(() => {
+    if (promptOpen && promptSections.length === 0 && !promptLoading) {
+      setPromptLoading(true);
+      apiFetch(`/clients/${orgId}/prompt`)
+        .then(d => {
+          setPromptSections(d.sections ?? []);
+          setPromptAgentName(d.agentName ?? '');
+        })
+        .catch(() => {})
+        .finally(() => setPromptLoading(false));
+    }
+  }, [promptOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAddNote = async () => {
     if (!newNote.trim()) return;
@@ -31,6 +81,7 @@ const ClientDetailPanel: React.FC<Props> = ({ orgId, onClose }) => {
     } catch (e) {} finally { setSaving(false); }
   };
 
+  // ── Styles ──────────────────────────────────────────────────────
   const panel: React.CSSProperties = {
     position: 'fixed', inset: 0, zIndex: 200, display: 'flex', justifyContent: 'flex-end',
   };
@@ -42,6 +93,31 @@ const ClientDetailPanel: React.FC<Props> = ({ orgId, onClose }) => {
   };
   const section: React.CSSProperties = { padding: '20px 24px', borderBottom: '1px solid var(--color-border)' };
   const label: React.CSSProperties = { fontSize: 11, color: 'var(--color-text-subtle)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 };
+  const collapsibleHeader: React.CSSProperties = {
+    ...section, display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', userSelect: 'none',
+  };
+
+  const statusDotColor = (status: string) => {
+    if (status === 'connected' || status === 'enabled') return 'var(--color-positive)';
+    return 'var(--color-text-subtle)';
+  };
+
+  const buildWidgetSrcdoc = (agentId: string, organizationId: string) => `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #f5f5f5; }
+</style></head><body>
+<script src="https://cdn.mira.ml/embed.html"></script>
+<script>
+  window.addEventListener('load', function() {
+    if (window.MiraDirect) {
+      window.MiraDirect.init({
+        agentId: '${agentId}',
+        organizationId: '${organizationId}',
+      });
+    }
+  });
+</script>
+</body></html>`;
 
   return (
     <div style={panel}>
@@ -74,6 +150,144 @@ const ClientDetailPanel: React.FC<Props> = ({ orgId, onClose }) => {
                 ))}
               </div>
             </div>
+
+            {/* ── SECTION 1: Integrations ──────────────────────────── */}
+            <div style={section}>
+              <div style={label}>Integrations</div>
+              {integrationsLoading ? (
+                <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Loading…</div>
+              ) : integrations.length === 0 ? (
+                <div style={{ fontSize: 13, color: 'var(--color-text-subtle)' }}>No integrations found</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {integrations.map(ig => (
+                    <div key={ig.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{
+                        display: 'inline-block', width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+                        background: statusDotColor(ig.status),
+                      }} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>{ig.label}</span>
+                          <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{ig.status}</span>
+                        </div>
+                        {ig.details.shopDomain && (
+                          <div style={{ fontSize: 12, color: 'var(--color-text-subtle)', marginTop: 2 }}>
+                            {ig.details.shopDomain}
+                            {ig.details.connectedAt && ` · connected ${new Date(ig.details.connectedAt).toLocaleDateString()}`}
+                          </div>
+                        )}
+                        {ig.details.propertyId && (
+                          <div style={{ fontSize: 12, color: 'var(--color-text-subtle)', marginTop: 2 }}>
+                            Property: {ig.details.propertyId}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* ── SECTION 2: Widget Preview ────────────────────────── */}
+            <div
+              style={collapsibleHeader}
+              onClick={() => setWidgetOpen(o => !o)}
+            >
+              <div style={{ ...label, marginBottom: 0 }}>Widget Preview</div>
+              {widgetOpen ? <ChevronUp size={16} color="var(--color-text-subtle)" /> : <ChevronDown size={16} color="var(--color-text-subtle)" />}
+            </div>
+            {widgetOpen && (
+              <div style={{ padding: '0 24px 20px' }}>
+                <div style={{
+                  fontSize: 12, color: 'var(--color-text-subtle)', fontStyle: 'italic',
+                  marginBottom: 12, lineHeight: 1.5,
+                }}>
+                  This is how their widget behaves — CSS overrides from their website won't appear here
+                </div>
+                {detail.agentId ? (
+                  <iframe
+                    title="Widget preview"
+                    srcDoc={buildWidgetSrcdoc(detail.agentId, orgId)}
+                    style={{
+                      width: '100%', height: 500, border: '1px solid var(--color-border)',
+                      borderRadius: 8, background: '#f5f5f5',
+                    }}
+                    sandbox="allow-scripts allow-same-origin allow-popups"
+                  />
+                ) : (
+                  <div style={{ fontSize: 13, color: 'var(--color-text-subtle)' }}>
+                    No agent ID found for this client
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── SECTION 3: Agent Prompt ──────────────────────────── */}
+            <div
+              style={collapsibleHeader}
+              onClick={() => setPromptOpen(o => !o)}
+            >
+              <div style={{ ...label, marginBottom: 0 }}>
+                Agent Prompt{promptAgentName ? ` — ${promptAgentName}` : ''}
+              </div>
+              {promptOpen ? <ChevronUp size={16} color="var(--color-text-subtle)" /> : <ChevronDown size={16} color="var(--color-text-subtle)" />}
+            </div>
+            {promptOpen && (
+              <div style={{ padding: '0 24px 20px' }}>
+                {promptLoading ? (
+                  <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Loading prompt data…</div>
+                ) : promptSections.length === 0 ? (
+                  <div style={{ fontSize: 13, color: 'var(--color-text-subtle)' }}>No prompt data available</div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {promptSections.map(ps => (
+                      <div key={ps.key}>
+                        <div style={{
+                          fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em',
+                          color: 'var(--color-accent)', marginBottom: 4,
+                        }}>
+                          {ps.label}
+                        </div>
+                        <div style={{
+                          fontSize: 12, color: 'var(--color-text-muted)', fontStyle: 'italic',
+                          marginBottom: 8, lineHeight: 1.4,
+                        }}>
+                          {ps.description}
+                        </div>
+                        {ps.key === 'tools' ? (
+                          /* Tools section — use colored badges */
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                            {ps.content.split('\n').map(line => {
+                              const active = line.includes('Active');
+                              return (
+                                <span key={line} style={{
+                                  fontSize: 12, fontWeight: 600, padding: '3px 10px', borderRadius: 4,
+                                  background: active ? 'rgba(95,141,114,0.12)' : 'rgba(44,40,37,0.06)',
+                                  color: active ? 'var(--color-positive)' : 'var(--color-text-muted)',
+                                }}>
+                                  {line}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          /* All other sections — monospace code block */
+                          <pre style={{
+                            fontFamily: 'monospace', fontSize: 12, lineHeight: 1.6,
+                            background: 'var(--color-bg-primary)', borderRadius: 8,
+                            padding: '12px 16px', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                            color: 'var(--color-text-primary)', border: '1px solid var(--color-border)',
+                          }}>
+                            {ps.content}
+                          </pre>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Flags */}
             {detail.flags.length > 0 && (
