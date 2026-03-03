@@ -8,7 +8,7 @@ interface Props {
 }
 
 const WorldAuthGuard: React.FC<Props> = ({ children }) => {
-  const { isLoading, isAuthenticated, user, loginWithRedirect, logout } = useAuth0();
+  const { isLoading, isAuthenticated, user, loginWithRedirect, logout, error } = useAuth0();
 
   if (isLoading) {
     return (
@@ -23,6 +23,11 @@ const WorldAuthGuard: React.FC<Props> = ({ children }) => {
       <div className="flex h-screen flex-col items-center justify-center bg-gray-950 gap-4">
         <div className="text-white text-lg font-semibold">Mira World</div>
         <div className="text-gray-400 text-sm">Internal operations dashboard</div>
+        {error && (
+          <div className="mt-2 px-4 py-3 bg-red-950 border border-red-800 rounded-lg max-w-sm text-center">
+            <div className="text-red-400 text-xs font-mono">{error.message}</div>
+          </div>
+        )}
         <button
           onClick={() => loginWithRedirect()}
           className="mt-4 px-5 py-2 bg-white text-gray-950 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors"
