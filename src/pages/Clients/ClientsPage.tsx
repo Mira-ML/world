@@ -22,10 +22,7 @@ const ClientsPage: React.FC = () => {
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch('/clients')
-      .then(d => setClients(d.clients ?? []))
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false));
+    apiFetch('/clients').then(d => setClients(d.clients ?? [])).catch(e => setError(e.message)).finally(() => setLoading(false));
   }, [apiFetch]);
 
   const filtered = clients.filter(c =>
@@ -35,73 +32,75 @@ const ClientsPage: React.FC = () => {
   );
 
   return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-lg font-semibold text-white">Clients</h1>
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+    <div style={{ padding: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--color-text-primary)' }}>Clients</h1>
+        <div style={{ position: 'relative' }}>
+          <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-subtle)' }} />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search clients…"
-            className="bg-white/5 border border-white/10 rounded-lg pl-8 pr-3 py-1.5 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-white/30"
+            style={{
+              background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
+              borderRadius: 8, paddingLeft: 36, paddingRight: 12, paddingTop: 8, paddingBottom: 8,
+              fontSize: 14, color: 'var(--color-text-primary)', outline: 'none',
+              fontFamily: 'var(--font-input)',
+            }}
           />
         </div>
       </div>
 
       {loading ? (
-        <div className="text-gray-500 text-sm">Loading…</div>
+        <div style={{ color: 'var(--color-text-muted)', fontSize: 14 }}>Loading…</div>
       ) : error ? (
-        <div className="text-red-400 text-sm">{error}</div>
+        <div style={{ color: 'var(--color-negative)', fontSize: 14 }}>{error}</div>
       ) : (
-        <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
+        <div style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-tile)', overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
-              <tr className="border-b border-white/10 text-xs text-gray-500 uppercase tracking-wide">
-                <th className="text-left px-4 py-3">Name</th>
-                <th className="text-left px-4 py-3">Industry</th>
-                <th className="text-right px-4 py-3">Convos (all)</th>
-                <th className="text-right px-4 py-3">Convos (30d)</th>
-                <th className="text-right px-4 py-3">Unique Users</th>
-                <th className="px-4 py-3" />
+              <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                {['Name', 'Industry', 'Convos (all)', 'Convos (30d)', 'Unique Users', ''].map((h, i) => (
+                  <th key={i} style={{
+                    padding: '12px 16px', textAlign: i >= 2 && i < 5 ? 'right' : 'left',
+                    fontSize: 11, color: 'var(--color-text-subtle)', fontWeight: 600,
+                    textTransform: 'uppercase', letterSpacing: '0.06em',
+                  }}>{h}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-gray-600 text-sm">
+                  <td colSpan={6} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--color-text-subtle)', fontSize: 14 }}>
                     {search ? 'No clients match your search' : 'No clients found'}
                   </td>
                 </tr>
-              ) : (
-                filtered.map(client => (
-                  <tr
-                    key={client.orgId}
-                    className="border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
-                    onClick={() => setSelectedOrgId(client.orgId)}
-                  >
-                    <td className="px-4 py-3">
-                      <div className="text-white font-medium">{client.orgName || '—'}</div>
-                      <div className="text-xs text-gray-600">{client.orgId}</div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-400">{client.industry ?? '—'}</td>
-                    <td className="px-4 py-3 text-right text-gray-300">{client.conversationsTotal.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right text-gray-300">{client.conversationsLast30d.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right text-gray-300">{client.uniqueUsers.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-right text-gray-600">
-                      <ChevronRight size={14} />
-                    </td>
-                  </tr>
-                ))
-              )}
+              ) : filtered.map(client => (
+                <tr
+                  key={client.orgId}
+                  style={{ borderBottom: '1px solid var(--color-border)', cursor: 'pointer', transition: 'background 0.15s' }}
+                  onClick={() => setSelectedOrgId(client.orgId)}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-surface-hover)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <td style={{ padding: '12px 16px' }}>
+                    <div style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{client.orgName || '—'}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginTop: 2 }}>{client.orgId}</div>
+                  </td>
+                  <td style={{ padding: '12px 16px', color: 'var(--color-text-muted)' }}>{client.industry ?? '—'}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{client.conversationsTotal.toLocaleString()}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{client.conversationsLast30d.toLocaleString()}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{client.uniqueUsers.toLocaleString()}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-subtle)' }}><ChevronRight size={14} /></td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
       )}
 
-      {selectedOrgId && (
-        <ClientDetailPanel orgId={selectedOrgId} onClose={() => setSelectedOrgId(null)} />
-      )}
+      {selectedOrgId && <ClientDetailPanel orgId={selectedOrgId} onClose={() => setSelectedOrgId(null)} />}
     </div>
   );
 };

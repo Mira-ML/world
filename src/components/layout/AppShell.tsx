@@ -1,105 +1,121 @@
 import React, { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
-import {
-  LayoutDashboard,
-  Users,
-  DollarSign,
-  MessageSquare,
-  Network,
-  ToggleLeft,
-  LogOut,
-  Menu,
-  X,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, LogOut, Menu } from 'lucide-react';
+import './AppShell.css';
 
 const NAV_ITEMS = [
-  { to: '/', label: 'Overview', icon: LayoutDashboard, end: true },
-  { to: '/clients', label: 'Clients', icon: Users, end: false },
-  { to: '/costs', label: 'Costs', icon: DollarSign, end: false },
-  { to: '/prompts', label: 'Prompts', icon: MessageSquare, end: false },
-  { to: '/network', label: 'Network', icon: Network, end: false },
-  { to: '/flags', label: 'Feature Flags', icon: ToggleLeft, end: false },
+  { to: '/', label: 'OVERVIEW', end: true },
+  { to: '/clients', label: 'CLIENTS', end: false },
+  { to: '/costs', label: 'COSTS', end: false },
+  { to: '/prompts', label: 'PROMPTS', end: false },
+  { to: '/network', label: 'NETWORK', end: false },
+  { to: '/flags', label: 'FEATURE FLAGS', end: false },
 ];
+
+const WORDMARK = 'https://s3.us-east-2.amazonaws.com/beta.mira.ml/terraWordmark.png';
+const WORDMARK_VERTICAL = 'https://s3.us-east-2.amazonaws.com/beta.mira.ml/WORDMARK_HORIZONTAL_(PURPLE).svg';
+const ORB_BLACK = 'https://s3.us-east-2.amazonaws.com/beta.mira.ml/ORB-BLACK.svg';
+const ORB_WHITE = 'https://s3.us-east-2.amazonaws.com/beta.mira.ml/ORB-WHITE.svg';
+const MOAI = 'https://s3.us-east-2.amazonaws.com/beta.mira.ml/3D_MOAI_ROCK-PURPLE.svg';
 
 const AppShell: React.FC = () => {
   const { user, logout } = useAuth0();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const location = useLocation();
 
-  const navLinkClass = ({ isActive }: { isActive: boolean }) =>
-    `flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-      isActive
-        ? 'bg-white/10 text-white font-medium'
-        : 'text-gray-400 hover:text-white hover:bg-white/5'
-    }`;
+  const sectionLabel = NAV_ITEMS.find(n =>
+    n.end ? location.pathname === '/' : location.pathname.startsWith(n.to)
+  )?.label ?? 'WORLD';
 
   return (
-    <div className="flex h-screen bg-gray-950 text-white overflow-hidden">
-      {/* Sidebar */}
-      <aside
-        className={`flex flex-col border-r border-white/10 transition-all duration-200 ${
-          sidebarOpen ? 'w-52' : 'w-14'
-        }`}
-        style={{ flexShrink: 0 }}
-      >
-        {/* Logo / toggle */}
-        <div className="flex items-center justify-between px-3 py-4 border-b border-white/10 h-[52px]">
-          {sidebarOpen && (
-            <span className="text-sm font-semibold text-white tracking-tight">Mira World</span>
-          )}
-          <button
-            onClick={() => setSidebarOpen(v => !v)}
-            className="text-gray-500 hover:text-white transition-colors ml-auto"
-            title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
-          >
-            {sidebarOpen ? <X size={16} /> : <Menu size={16} />}
-          </button>
+    <div className="app-shell">
+      {mobileOpen && (
+        <div className="app-shell__overlay" onClick={() => setMobileOpen(false)} />
+      )}
+
+      <aside className={`app-shell__sidebar${collapsed ? ' app-shell__sidebar--collapsed' : ''}${mobileOpen ? ' app-shell__sidebar--mobile-open' : ''}`}>
+        <div className="app-shell__logo">
+          <NavLink to="/" className="app-shell__logo-link">
+            <img src={WORDMARK} alt="Mira" className="app-shell__logo-wordmark" />
+            <img src={WORDMARK_VERTICAL} alt="Mira" className="app-shell__logo-vertical" />
+          </NavLink>
         </div>
 
-        {/* Nav */}
-        <nav className="flex-1 px-2 py-3 flex flex-col gap-1 overflow-y-auto">
-          {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
-            <NavLink key={to} to={to} end={end} className={navLinkClass} title={!sidebarOpen ? label : undefined}>
-              <Icon size={16} className="shrink-0" />
-              {sidebarOpen && <span>{label}</span>}
+        <nav className="app-shell__nav">
+          {NAV_ITEMS.map(({ to, label, end }) => (
+            <NavLink
+              key={to}
+              to={to}
+              end={end}
+              className={({ isActive }) => `app-shell__nav-item${isActive ? ' app-shell__nav-item--active' : ''}`}
+              title={collapsed ? label : undefined}
+            >
+              {({ isActive }) => (
+                <>
+                  <img src={isActive ? ORB_WHITE : ORB_BLACK} alt="" className="app-shell__nav-orb" />
+                  <span className="app-shell__nav-label">{label}</span>
+                </>
+              )}
             </NavLink>
           ))}
         </nav>
 
-        {/* User */}
-        <div className="border-t border-white/10 px-3 py-3">
-          {sidebarOpen ? (
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-xs font-medium shrink-0">
-                {user?.email?.[0]?.toUpperCase() ?? '?'}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs text-gray-300 truncate">{user?.email}</div>
-              </div>
-              <button
-                onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
-                className="text-gray-600 hover:text-gray-300 transition-colors"
-                title="Sign out"
-              >
-                <LogOut size={14} />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
-              className="text-gray-600 hover:text-gray-300 transition-colors"
-              title="Sign out"
-            >
-              <LogOut size={16} />
-            </button>
-          )}
+        <div className="app-shell__sidebar-bottom">
+          <button
+            className="app-shell__collapse-toggle"
+            onClick={() => setCollapsed(v => !v)}
+            title={collapsed ? 'Expand' : 'Collapse'}
+          >
+            {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-y-auto">
-        <Outlet />
-      </main>
+      <div className={`app-shell__main-wrapper${collapsed ? ' app-shell__main-wrapper--expanded' : ''}`}>
+        <header className="app-shell__topnav">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <button className="app-shell__mobile-toggle" onClick={() => setMobileOpen(v => !v)}>
+              <span className="app-shell__hamburger" />
+            </button>
+            <span className="app-shell__section-title">{sectionLabel}</span>
+          </div>
+
+          <div className="app-shell__user-menu">
+            <button className="app-shell__user-trigger" onClick={() => setUserMenuOpen(v => !v)}>
+              <img src={MOAI} alt="" style={{ width: 24, height: 24 }} />
+              <span className="app-shell__user-name">{user?.name ?? user?.email ?? 'Mira'}</span>
+              <ChevronDown size={12} style={{ color: 'var(--color-text-muted)', marginLeft: 2 }} />
+            </button>
+
+            {userMenuOpen && (
+              <>
+                <div className="app-shell__user-menu-backdrop" onClick={() => setUserMenuOpen(false)} />
+                <div className="app-shell__user-dropdown">
+                  <div className="app-shell__user-dropdown-info">
+                    <div className="app-shell__user-dropdown-name">{user?.name ?? 'Team Member'}</div>
+                    <div className="app-shell__user-dropdown-email">{user?.email}</div>
+                  </div>
+                  <hr className="app-shell__user-dropdown-divider" />
+                  <button
+                    className="app-shell__user-dropdown-item app-shell__user-dropdown-item--danger"
+                    onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}
+                  >
+                    <LogOut size={14} />
+                    Sign out
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </header>
+
+        <main className="app-shell__content">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 };

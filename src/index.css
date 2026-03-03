@@ -1,48 +1,88 @@
+@font-face {
+  font-family: 'ITC Avant Garde Gothic';
+  src: url('https://s3.us-east-2.amazonaws.com/beta.mira.ml/ITC+Avant+Garde+Gothic+CE+Demi.otf') format('opentype');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ITC Avant Garde Gothic';
+  src: url('https://s3.us-east-2.amazonaws.com/beta.mira.ml/ITC+Avant+Garde+Gothic+CE+Demi+Oblique.otf') format('opentype');
+  font-weight: 600;
+  font-style: oblique;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Filson Pro';
+  src: url('https://s3.us-east-2.amazonaws.com/beta.mira.ml/FilsonProMedium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --color-bg-primary: #030712;
-  --color-bg-surface: rgba(255, 255, 255, 0.04);
-  --color-bg-surface-hover: rgba(255, 255, 255, 0.07);
-  --color-text-primary: #f9fafb;
-  --color-text-muted: #9ca3af;
-  --color-text-subtle: #6b7280;
-  --color-accent: #3b82f6;
-  --color-accent-hover: #2563eb;
-  --color-accent-muted: rgba(59, 130, 246, 0.15);
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-hover: rgba(255, 255, 255, 0.16);
+  --color-bg-primary: #F5EBE0;
+  --color-bg-surface: #FFFFFF;
+  --color-bg-surface-hover: #EDF5F0;
+
+  --color-text-primary: #2C2825;
+  --color-text-muted: rgba(44, 40, 37, 0.65);
+  --color-text-subtle: rgba(44, 40, 37, 0.45);
+  --color-text-on-dark: #F5EBE0;
+
+  /* Primary accent — Slate Teal (swapped: was terracotta in client-dashboard) */
+  --color-accent: #4A6C6F;
+  --color-accent-hover: #5A7F82;
+  --color-accent-muted: rgba(74, 108, 111, 0.12);
+  --color-accent-light: #8BADB0;
+
+  /* Secondary — Terracotta (swapped: used for destructive/red buttons) */
+  --color-secondary: #A85951;
+  --color-secondary-hover: #BF6A62;
+  --color-secondary-muted: rgba(168, 89, 81, 0.12);
+
+  --color-positive: #5F8D72;
+  --color-negative: #A85951;
+  --color-neutral: #8F7F73;
+
+  --color-border: #E0D5CA;
+  --color-border-hover: rgba(44, 40, 37, 0.22);
+
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 64px;
+  --topnav-height: 56px;
+
+  --font-primary: 'ITC Avant Garde Gothic', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-input: 'Filson Pro', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+  --radius-tile: 20px;
 }
 
-* {
-  box-sizing: border-box;
+* { box-sizing: border-box; }
+
+input, textarea, select {
+  font-family: var(--font-input, 'Filson Pro', sans-serif);
 }
 
 body {
   margin: 0;
-  background: var(--color-bg-primary);
-  color: var(--color-text-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: var(--font-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
 }
 
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 3px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-border-hover); }

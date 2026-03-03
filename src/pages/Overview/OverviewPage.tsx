@@ -4,7 +4,7 @@ import { Activity, DollarSign, Users, Network, AlertTriangle, CheckCircle, XCirc
 
 interface ServiceHealth {
   name: string;
-  status: 'healthy' | 'degraded' | 'down' | 'unknown';
+  status: 'healthy' | 'degraded' | 'down' | 'stopped' | 'unknown';
   runningTasks: number;
 }
 
@@ -19,31 +19,33 @@ interface OverviewData {
   recentAlarms: { alarmName: string; stateValue: string; updatedAt: string }[];
 }
 
-const StatusDot: React.FC<{ status: ServiceHealth['status'] }> = ({ status }) => {
-  const colors: Record<ServiceHealth['status'], string> = {
-    healthy: 'bg-green-500',
-    degraded: 'bg-yellow-500',
-    down: 'bg-red-500',
-    unknown: 'bg-gray-500',
-  };
-  return <span className={`inline-block w-2 h-2 rounded-full ${colors[status]}`} />;
+const STATUS_COLORS: Record<string, string> = {
+  healthy: '#5F8D72',
+  degraded: '#B98B2A',
+  down: '#A85951',
+  stopped: '#8F7F73',
+  unknown: '#8F7F73',
 };
 
-const StatCard: React.FC<{
-  label: string;
-  value: string;
-  sub?: string;
-  icon: React.ReactNode;
-  trend?: 'up' | 'down' | 'neutral';
-}> = ({ label, value, sub, icon, trend }) => (
-  <div className="bg-white/5 border border-white/10 rounded-xl p-5">
-    <div className="flex items-start justify-between">
+const StatusDot: React.FC<{ status: string }> = ({ status }) => (
+  <span style={{
+    display: 'inline-block', width: 8, height: 8, borderRadius: '50%',
+    background: STATUS_COLORS[status] ?? '#8F7F73', flexShrink: 0,
+  }} />
+);
+
+const StatCard: React.FC<{ label: string; value: string; sub?: string; icon: React.ReactNode }> = ({ label, value, sub, icon }) => (
+  <div style={{
+    background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
+    borderRadius: 'var(--radius-tile)', padding: 20,
+  }}>
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
       <div>
-        <div className="text-xs text-gray-500 mb-1">{label}</div>
-        <div className="text-2xl font-semibold text-white">{value}</div>
-        {sub && <div className="text-xs text-gray-500 mt-1">{sub}</div>}
+        <div style={{ fontSize: 12, color: 'var(--color-text-subtle)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+        <div style={{ fontSize: 24, fontWeight: 600, color: 'var(--color-text-primary)' }}>{value}</div>
+        {sub && <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 4 }}>{sub}</div>}
       </div>
-      <div className="text-gray-600">{icon}</div>
+      <div style={{ color: 'var(--color-accent)', opacity: 0.7 }}>{icon}</div>
     </div>
   </div>
 );
@@ -57,95 +59,61 @@ const OverviewPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    apiFetch('/overview')
-      .then(setData)
-      .catch(e => setError(e.message))
-      .finally(() => setLoading(false));
+    apiFetch('/overview').then(setData).catch(e => setError(e.message)).finally(() => setLoading(false));
   }, [apiFetch]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full text-gray-500 text-sm">
-        Loading overview…
-      </div>
-    );
-  }
-
-  if (error || !data) {
-    return (
-      <div className="flex items-center justify-center h-full text-red-400 text-sm">
-        {error ?? 'Failed to load overview data'}
-      </div>
-    );
-  }
+  if (loading) return <div style={{ padding: 24, color: 'var(--color-text-muted)', fontSize: 14 }}>Loading overview…</div>;
+  if (error || !data) return <div style={{ padding: 24, color: 'var(--color-negative)', fontSize: 14 }}>{error ?? 'Failed to load overview data'}</div>;
 
   const awsDelta = data.awsCostCurrentMonth - data.awsCostLastMonth;
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-lg font-semibold text-white">Overview</h1>
+    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
+      <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--color-text-primary)' }}>Overview</h1>
 
       {/* Service health strip */}
-      <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-        <div className="text-xs text-gray-500 mb-3 font-medium uppercase tracking-wide">Service Health</div>
-        <div className="flex flex-wrap gap-3">
+      <div style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-tile)', padding: 20 }}>
+        <div style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginBottom: 14, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
+          Service Health
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
           {data.serviceHealth.map(svc => (
-            <div key={svc.name} className="flex items-center gap-2 text-xs text-gray-300">
+            <div key={svc.name} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--color-text-primary)' }}>
               <StatusDot status={svc.status} />
-              <span>{svc.name}</span>
-              {svc.runningTasks > 0 && (
-                <span className="text-gray-600">({svc.runningTasks})</span>
-              )}
+              <span>{svc.name.replace(/-/g, ' ').replace('mira ', '').replace(' tasks service', '').replace(' family service', '')}</span>
+              {svc.runningTasks > 0 && <span style={{ color: 'var(--color-text-subtle)', fontSize: 11 }}>({svc.runningTasks})</span>}
             </div>
           ))}
         </div>
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="AWS Cost (this month)"
-          value={fmt$(data.awsCostCurrentMonth)}
-          sub={`${awsDelta >= 0 ? '+' : ''}${fmt$(awsDelta)} vs last month`}
-          icon={<DollarSign size={20} />}
-        />
-        <StatCard
-          label="Anthropic Cost (this month)"
-          value={fmt$(data.anthropicCostCurrentMonth)}
-          icon={<Activity size={20} />}
-        />
-        <StatCard
-          label="Active Clients (30d)"
-          value={String(data.activeClients30d)}
-          sub={`${data.totalClients} total`}
-          icon={<Users size={20} />}
-        />
-        <StatCard
-          label="Network Connections"
-          value={String(data.networkConnections)}
-          icon={<Network size={20} />}
-        />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+        <StatCard label="AWS Cost (MTD)" value={fmt$(data.awsCostCurrentMonth)} sub={`${awsDelta >= 0 ? '+' : ''}${fmt$(awsDelta)} vs last month`} icon={<DollarSign size={20} />} />
+        <StatCard label="Anthropic Cost (MTD)" value={fmt$(data.anthropicCostCurrentMonth)} icon={<Activity size={20} />} />
+        <StatCard label="Active Clients (30d)" value={String(data.activeClients30d)} sub={`${data.totalClients} total`} icon={<Users size={20} />} />
+        <StatCard label="Network Connections" value={String(data.networkConnections)} icon={<Network size={20} />} />
       </div>
 
       {/* Recent alarms */}
-      <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-        <div className="text-xs text-gray-500 mb-3 font-medium uppercase tracking-wide">Recent Alarms</div>
+      <div style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-tile)', padding: 20 }}>
+        <div style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginBottom: 14, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600 }}>
+          Active Alarms
+        </div>
         {data.recentAlarms.length === 0 ? (
-          <div className="flex items-center gap-2 text-green-400 text-sm">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-positive)', fontSize: 14 }}>
             <CheckCircle size={14} />
             <span>No active alarms</span>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {data.recentAlarms.map((alarm, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm">
-                {alarm.stateValue === 'ALARM' ? (
-                  <XCircle size={14} className="text-red-400 shrink-0" />
-                ) : (
-                  <AlertTriangle size={14} className="text-yellow-400 shrink-0" />
-                )}
-                <span className="text-gray-300">{alarm.alarmName}</span>
-                <span className="text-gray-600 text-xs ml-auto">{alarm.updatedAt}</span>
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+                {alarm.stateValue === 'ALARM'
+                  ? <XCircle size={14} style={{ color: 'var(--color-negative)', flexShrink: 0 }} />
+                  : <AlertTriangle size={14} style={{ color: '#B98B2A', flexShrink: 0 }} />}
+                <span style={{ color: 'var(--color-text-primary)' }}>{alarm.alarmName}</span>
+                <span style={{ color: 'var(--color-text-subtle)', fontSize: 11, marginLeft: 'auto' }}>{alarm.updatedAt}</span>
               </div>
             ))}
           </div>
