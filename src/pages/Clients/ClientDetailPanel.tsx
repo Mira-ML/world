@@ -33,6 +33,11 @@ const ClientDetailPanel: React.FC<Props> = ({ orgId, onClose }) => {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [integrationsLoading, setIntegrationsLoading] = useState(false);
 
+  // Noteworthy Logic pill
+  const [noteworthyOpen, setNoteworthyOpen] = useState(false);
+  const [noteworthyPrompt, setNoteworthyPrompt] = useState<string | null>(null);
+  const [noteworthyLoading, setNoteworthyLoading] = useState(false);
+
   // Widget preview
   const [widgetOpen, setWidgetOpen] = useState(false);
 
@@ -56,6 +61,20 @@ const ClientDetailPanel: React.FC<Props> = ({ orgId, onClose }) => {
       .catch(() => {})
       .finally(() => setIntegrationsLoading(false));
   }, [orgId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load noteworthy prompt lazily when expanded
+  useEffect(() => {
+    if (noteworthyOpen && noteworthyPrompt === null && !noteworthyLoading) {
+      setNoteworthyLoading(true);
+      apiFetch('/prompts')
+        .then((d: { prompts?: Array<{ prompt_id: string; prompt_body: string }> }) => {
+          const entry = (d.prompts ?? []).find((p) => p.prompt_id === 'NOTEWORTHY_001');
+          setNoteworthyPrompt(entry?.prompt_body ?? '');
+        })
+        .catch(() => setNoteworthyPrompt(''))
+        .finally(() => setNoteworthyLoading(false));
+    }
+  }, [noteworthyOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load prompt data lazily when expanded
   useEffect(() => {
@@ -188,6 +207,39 @@ const ClientDetailPanel: React.FC<Props> = ({ orgId, onClose }) => {
                 </div>
               )}
             </div>
+
+            {/* ── SECTION 1b: Noteworthy Logic ─────────────────────── */}
+            <div
+              style={collapsibleHeader}
+              onClick={() => setNoteworthyOpen(o => !o)}
+            >
+              <div style={{ ...label, marginBottom: 0 }}>Noteworthy Logic</div>
+              {noteworthyOpen ? <ChevronUp size={16} color="var(--color-text-subtle)" /> : <ChevronDown size={16} color="var(--color-text-subtle)" />}
+            </div>
+            {noteworthyOpen && (
+              <div style={{ padding: '0 24px 20px' }}>
+                <div style={{
+                  fontSize: 12, color: 'var(--color-text-subtle)', fontStyle: 'italic',
+                  marginBottom: 12, lineHeight: 1.5,
+                }}>
+                  This prompt governs noteworthy classification across all conversations. Per-org overrides are a future feature.
+                </div>
+                {noteworthyLoading ? (
+                  <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Loading…</div>
+                ) : noteworthyPrompt === '' ? (
+                  <div style={{ fontSize: 13, color: 'var(--color-text-subtle)' }}>No prompt found</div>
+                ) : (
+                  <pre style={{
+                    fontFamily: 'monospace', fontSize: 12, lineHeight: 1.6,
+                    background: 'var(--color-bg-primary)', borderRadius: 8,
+                    padding: '12px 16px', margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                    color: 'var(--color-text-primary)', border: '1px solid var(--color-border)',
+                  }}>
+                    {noteworthyPrompt}
+                  </pre>
+                )}
+              </div>
+            )}
 
             {/* ── SECTION 2: Widget Preview ────────────────────────── */}
             <div
