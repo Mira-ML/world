@@ -12,6 +12,8 @@ interface Prompt {
   updatedBy: string;
 }
 
+type TabId = 'client-dashboard' | 'agents';
+
 const card: React.CSSProperties = {
   background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-tile)',
 };
@@ -21,13 +23,17 @@ const PromptsPage: React.FC = () => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabId>('client-dashboard');
   const [editing, setEditing] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState<Record<string, boolean>>({});
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [saveError, setSaveError] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    apiFetch('/prompts').then(d => setPrompts(d.prompts ?? [])).catch(e => setError(e.message)).finally(() => setLoading(false));
+    apiFetch('/prompts')
+      .then(d => setPrompts(d.prompts ?? []))
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false));
   }, [apiFetch]);
 
   const handleSave = async (promptId: string) => {
@@ -46,6 +52,24 @@ const PromptsPage: React.FC = () => {
     }
   };
 
+  const tabPrompts = activeTab === 'agents'
+    ? prompts.filter(p => p.promptId.startsWith('AGENT_'))
+    : prompts.filter(p => !p.promptId.startsWith('AGENT_'));
+
+  const tabStyle = (id: TabId): React.CSSProperties => ({
+    padding: '8px 18px',
+    fontSize: 13,
+    fontWeight: activeTab === id ? 600 : 400,
+    color: activeTab === id ? 'var(--color-accent)' : 'var(--color-text-muted)',
+    borderBottom: activeTab === id ? '2px solid var(--color-accent)' : '2px solid transparent',
+    background: 'none',
+    border: 'none',
+    borderBottom: activeTab === id ? '2px solid var(--color-accent)' : '2px solid transparent',
+    cursor: 'pointer',
+    fontFamily: 'var(--font-primary)',
+    transition: 'color 0.15s',
+  });
+
   if (loading) return <div style={{ padding: 24, color: 'var(--color-text-muted)', fontSize: 14 }}>Loading prompts…</div>;
   if (error) return <div style={{ padding: 24, color: 'var(--color-negative)', fontSize: 14 }}>{error}</div>;
 
@@ -53,10 +77,33 @@ const PromptsPage: React.FC = () => {
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--color-text-primary)' }}>Prompts</h1>
-        <div style={{ fontSize: 12, color: 'var(--color-text-subtle)' }}>{prompts.length} prompts</div>
+        <div style={{ fontSize: 12, color: 'var(--color-text-subtle)' }}>{tabPrompts.length} prompts</div>
       </div>
 
-      {prompts.map(prompt => {
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--color-border)', marginBottom: 4 }}>
+        <button style={tabStyle('client-dashboard')} onClick={() => setActiveTab('client-dashboard')}>
+          Client Dashboard
+        </button>
+        <button style={tabStyle('agents')} onClick={() => setActiveTab('agents')}>
+          Agents
+        </button>
+      </div>
+
+      {activeTab === 'agents' && (
+        <div style={{
+          padding: '10px 14px', background: 'var(--color-bg-surface)',
+          border: '1px solid var(--color-border)', borderRadius: 8,
+          fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.6,
+        }}>
+          These are the system prompt section templates injected into every ConsumerAgent conversation.
+          Each section is conditionally added based on the org's data (FAQs, integrations, network connections).
+          Tokens like <code style={{ fontFamily: 'var(--font-input)', background: 'var(--color-bg-primary)', padding: '1px 4px', borderRadius: 3 }}>{'{token}'}</code> are
+          replaced at runtime. Edits take effect within 5 minutes via cache TTL.
+        </div>
+      )}
+
+      {tabPrompts.map(prompt => {
         const isExpanded = expanded[prompt.promptId];
         const isDirty = editing[prompt.promptId] !== undefined;
         const currentBody = editing[prompt.promptId] ?? prompt.promptBody;
@@ -68,9 +115,9 @@ const PromptsPage: React.FC = () => {
               onClick={() => setExpanded(e => ({ ...e, [prompt.promptId]: !e[prompt.promptId] }))}
             >
               <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 12, color: 'var(--color-accent)', fontWeight: 600 }}>{prompt.promptId}</span>
-                  <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' }}>{prompt.displayName}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>{prompt.displayName}</span>
+                  <span style={{ fontSize: 11, color: 'var(--color-text-subtle)', fontFamily: 'var(--font-input)' }}>{prompt.promptId}</span>
                   {isDirty && <span style={{ fontSize: 10, background: 'var(--color-accent-muted)', color: 'var(--color-accent)', borderRadius: 4, padding: '2px 6px' }}>unsaved</span>}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 3 }}>{prompt.description}</div>
@@ -85,8 +132,8 @@ const PromptsPage: React.FC = () => {
               <div style={{ padding: '0 20px 20px', borderTop: '1px solid var(--color-border)' }}>
                 <textarea
                   value={currentBody}
-                  onChange={e => setEditing(ed => ({ ...ed, [prompt.promptId]: e.target.value }))}
-                  rows={10}
+                  onChange={ev => setEditing(ed => ({ ...ed, [prompt.promptId]: ev.target.value }))}
+                  rows={12}
                   style={{
                     width: '100%', marginTop: 16, background: 'var(--color-bg-primary)',
                     border: '1px solid var(--color-border)', borderRadius: 8, padding: '12px 14px',
