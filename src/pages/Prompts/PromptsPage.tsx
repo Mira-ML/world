@@ -61,7 +61,6 @@ const PromptsPage: React.FC = () => {
     fontSize: 13,
     fontWeight: activeTab === id ? 600 : 400,
     color: activeTab === id ? 'var(--color-accent)' : 'var(--color-text-muted)',
-    borderBottom: activeTab === id ? '2px solid var(--color-accent)' : '2px solid transparent',
     background: 'none',
     border: 'none',
     borderBottom: activeTab === id ? '2px solid var(--color-accent)' : '2px solid transparent',
