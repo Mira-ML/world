@@ -14,8 +14,7 @@ export const WorldDataProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const { getAccessTokenSilently } = useAuth0();
 
   const doFetch = useCallback(async (url: string, options: RequestInit = {}) => {
-    const org = process.env.REACT_APP_AUTH0_ORG;
-    const token = await getAccessTokenSilently(org ? { authorizationParams: { organization: org } } : undefined);
+    const token = await getAccessTokenSilently();
     const res = await fetch(url, {
       ...options,
       headers: {
