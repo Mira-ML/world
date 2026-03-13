@@ -4,7 +4,15 @@ import { X, Plus, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Flag { flagKey: string; scopeOrg: string; value: string | boolean; updatedAt: string; }
 interface Note { orgId: string; createdAt: string; noteBody: string; createdBy: string; }
-interface ClientDetail { orgId: string; orgName: string; industry?: string; status?: string; agentId?: string; notes: Note[]; flags: Flag[]; }
+interface BillingInfo {
+  subscriptionStatus?: string;
+  includedConversations?: number;
+  overageBlocksCharged?: number;
+  conversationsUsed?: number;
+  currentPeriodStart?: number;
+  currentPeriodEnd?: number;
+}
+interface ClientDetail { orgId: string; orgName: string; industry?: string; status?: string; agentId?: string; notes: Note[]; flags: Flag[]; billing?: BillingInfo; }
 
 interface Integration {
   key: string;
@@ -208,7 +216,55 @@ const ClientDetailPanel: React.FC<Props> = ({ orgId, onClose }) => {
               )}
             </div>
 
-            {/* ── SECTION 1b: Noteworthy Logic ─────────────────────── */}
+            {/* ── SECTION 1b: Billing & Usage ────────────────────── */}
+            {detail.billing && (() => {
+              const b = detail.billing;
+              const included = b.includedConversations ?? 1000;
+              const used = b.conversationsUsed ?? 0;
+              const overage = b.overageBlocksCharged ?? 0;
+              const pct = included > 0 ? Math.min(100, Math.round((used / included) * 100)) : 0;
+              const statusColor = b.subscriptionStatus === 'active' ? 'var(--color-positive)'
+                : b.subscriptionStatus === 'canceled' || b.subscriptionStatus === 'past_due' ? '#e74c3c'
+                : 'var(--color-text-muted)';
+              return (
+                <div style={section}>
+                  <div style={label}>Billing & Usage</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 14 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginBottom: 2 }}>Subscription</div>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: statusColor }}>
+                        {b.subscriptionStatus ?? 'none'}
+                      </div>
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginBottom: 2 }}>Overage Blocks</div>
+                      <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' }}>{overage}</div>
+                    </div>
+                  </div>
+                  {/* Usage bar */}
+                  <div style={{ marginBottom: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--color-text-subtle)', marginBottom: 4 }}>
+                      <span>Conversations this month</span>
+                      <span>{used.toLocaleString()} / {included.toLocaleString()}</span>
+                    </div>
+                    <div style={{ height: 8, borderRadius: 4, background: 'var(--color-bg-primary)', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%', borderRadius: 4, transition: 'width 0.3s ease',
+                        width: `${pct}%`,
+                        background: pct >= 100 ? '#e74c3c' : pct >= 80 ? '#f39c12' : 'var(--color-accent)',
+                      }} />
+                    </div>
+                  </div>
+                  {b.currentPeriodEnd && (
+                    <div style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>
+                      Period ends {new Date(b.currentPeriodEnd * 1000).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* ── SECTION 1c: Noteworthy Logic ─────────────────────── */}
             <div
               style={collapsibleHeader}
               onClick={() => setNoteworthyOpen(o => !o)}
