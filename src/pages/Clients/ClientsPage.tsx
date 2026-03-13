@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useWorldData } from '../../contexts/WorldDataContext';
 import ClientDetailPanel from './ClientDetailPanel';
-import { Search, ChevronRight } from 'lucide-react';
+import { Search, ChevronRight, EyeOff, Eye } from 'lucide-react';
 
 interface Client {
   orgId: string;
@@ -11,6 +11,8 @@ interface Client {
   conversationsLast30d: number;
   uniqueUsers: number;
   status?: string;
+  tombstoned?: boolean;
+  tombstonedAt?: string;
 }
 
 const ClientsPage: React.FC = () => {
@@ -20,34 +22,68 @@ const ClientsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+  const [showTombstoned, setShowTombstoned] = useState(false);
+  const [tombstoning, setTombstoning] = useState<string | null>(null);
 
   useEffect(() => {
     apiFetch('/clients').then(d => setClients(d.clients ?? [])).catch(e => setError(e.message)).finally(() => setLoading(false));
   }, [apiFetch]);
 
-  const filtered = clients.filter(c =>
-    c.orgName?.toLowerCase().includes(search.toLowerCase()) ||
-    c.orgId?.toLowerCase().includes(search.toLowerCase()) ||
-    c.industry?.toLowerCase().includes(search.toLowerCase())
-  );
+  const handleTombstone = async (orgId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.confirm(`Are you sure you want to tombstone this client? This will deactivate their account.`)) return;
+    setTombstoning(orgId);
+    try {
+      await apiFetch(`/clients/${orgId}/tombstone`, { method: 'PUT' });
+      setClients(prev => prev.map(c => c.orgId === orgId ? { ...c, tombstoned: true, tombstonedAt: new Date().toISOString() } : c));
+    } catch (err) {
+      alert(`Failed to tombstone client: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setTombstoning(null);
+    }
+  };
+
+  const filtered = clients
+    .filter(c => showTombstoned || !c.tombstoned)
+    .filter(c =>
+      c.orgName?.toLowerCase().includes(search.toLowerCase()) ||
+      c.orgId?.toLowerCase().includes(search.toLowerCase()) ||
+      c.industry?.toLowerCase().includes(search.toLowerCase())
+    );
 
   return (
     <div style={{ padding: 24 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--color-text-primary)' }}>Clients</h1>
-        <div style={{ position: 'relative' }}>
-          <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-subtle)' }} />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search clients…"
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button
+            onClick={() => setShowTombstoned(prev => !prev)}
             style={{
+              display: 'flex', alignItems: 'center', gap: 6,
               background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
-              borderRadius: 8, paddingLeft: 36, paddingRight: 12, paddingTop: 8, paddingBottom: 8,
-              fontSize: 14, color: 'var(--color-text-primary)', outline: 'none',
+              borderRadius: 8, padding: '8px 12px', fontSize: 13,
+              color: 'var(--color-text-muted)', cursor: 'pointer',
               fontFamily: 'var(--font-input)',
             }}
-          />
+            title={showTombstoned ? 'Hide tombstoned clients' : 'Show tombstoned clients'}
+          >
+            {showTombstoned ? <Eye size={14} /> : <EyeOff size={14} />}
+            {showTombstoned ? 'Showing all' : 'Hiding tombstoned'}
+          </button>
+          <div style={{ position: 'relative' }}>
+            <Search size={14} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--color-text-subtle)' }} />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search clients…"
+              style={{
+                background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
+                borderRadius: 8, paddingLeft: 36, paddingRight: 12, paddingTop: 8, paddingBottom: 8,
+                fontSize: 14, color: 'var(--color-text-primary)', outline: 'none',
+                fontFamily: 'var(--font-input)',
+              }}
+            />
+          </div>
         </div>
       </div>
 
@@ -79,20 +115,62 @@ const ClientsPage: React.FC = () => {
               ) : filtered.map(client => (
                 <tr
                   key={client.orgId}
-                  style={{ borderBottom: '1px solid var(--color-border)', cursor: 'pointer', transition: 'background 0.15s' }}
+                  style={{
+                    borderBottom: '1px solid var(--color-border)',
+                    cursor: 'pointer',
+                    transition: 'background 0.15s',
+                    opacity: client.tombstoned ? 0.45 : 1,
+                  }}
                   onClick={() => setSelectedOrgId(client.orgId)}
                   onMouseEnter={e => (e.currentTarget.style.background = 'var(--color-bg-surface-hover)')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
                   <td style={{ padding: '12px 16px' }}>
-                    <div style={{ fontWeight: 500, color: 'var(--color-text-primary)' }}>{client.orgName || '—'}</div>
-                    <div style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginTop: 2 }}>{client.orgId}</div>
+                    <div style={{
+                      fontWeight: 500,
+                      color: 'var(--color-text-primary)',
+                      textDecoration: client.tombstoned ? 'line-through' : 'none',
+                      display: 'flex', alignItems: 'center', gap: 8,
+                    }}>
+                      {client.orgName || '—'}
+                      {client.tombstoned && (
+                        <span style={{
+                          fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
+                          background: '#B91C1C', color: '#fff', borderRadius: 4,
+                          padding: '2px 6px', letterSpacing: '0.04em',
+                          textDecoration: 'none',
+                        }}>Tombstoned</span>
+                      )}
+                    </div>
+                    <div style={{
+                      fontSize: 11, color: 'var(--color-text-subtle)', marginTop: 2,
+                      textDecoration: client.tombstoned ? 'line-through' : 'none',
+                    }}>{client.orgId}</div>
                   </td>
-                  <td style={{ padding: '12px 16px', color: 'var(--color-text-muted)' }}>{client.industry ?? '—'}</td>
+                  <td style={{ padding: '12px 16px', color: 'var(--color-text-muted)', textDecoration: client.tombstoned ? 'line-through' : 'none' }}>{client.industry ?? '—'}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{client.conversationsTotal.toLocaleString()}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{client.conversationsLast30d.toLocaleString()}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{client.uniqueUsers.toLocaleString()}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-subtle)' }}><ChevronRight size={14} /></td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
+                      {!client.tombstoned && (
+                        <button
+                          onClick={(e) => handleTombstone(client.orgId, e)}
+                          disabled={tombstoning === client.orgId}
+                          style={{
+                            background: 'transparent', border: '1px solid var(--color-border)',
+                            borderRadius: 6, padding: '4px 10px', fontSize: 11,
+                            color: 'var(--color-text-muted)', cursor: 'pointer',
+                            fontFamily: 'var(--font-input)', opacity: tombstoning === client.orgId ? 0.5 : 1,
+                          }}
+                          title="Tombstone this client"
+                        >
+                          {tombstoning === client.orgId ? '…' : 'Tombstone'}
+                        </button>
+                      )}
+                      <ChevronRight size={14} style={{ color: 'var(--color-text-subtle)' }} />
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
