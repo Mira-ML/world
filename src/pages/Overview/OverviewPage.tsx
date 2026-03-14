@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useWorldData } from '../../contexts/WorldDataContext';
-import { Activity, DollarSign, Users, Network, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
+import { Activity, DollarSign, Users, Network, AlertTriangle, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 
 interface ServiceHealth {
   name: string;
@@ -57,6 +57,21 @@ const OverviewPage: React.FC = () => {
   const [data, setData] = useState<OverviewData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshState, setRefreshState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [lastTriggeredAt, setLastTriggeredAt] = useState<string | null>(null);
+
+  const handleRefreshStats = useCallback(async () => {
+    setRefreshState('loading');
+    try {
+      const data = await apiFetch('/refresh-stats', { method: 'POST' });
+      setLastTriggeredAt(data.triggeredAt);
+      setRefreshState('success');
+      setTimeout(() => setRefreshState('idle'), 2000);
+    } catch {
+      setRefreshState('error');
+      setTimeout(() => setRefreshState('idle'), 3000);
+    }
+  }, [apiFetch]);
 
   useEffect(() => {
     apiFetch('/overview').then(setData).catch(e => setError(e.message)).finally(() => setLoading(false));
@@ -69,7 +84,38 @@ const OverviewPage: React.FC = () => {
 
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 24 }}>
-      <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--color-text-primary)' }}>Overview</h1>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--color-text-primary)' }}>Overview</h1>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+          <button
+            onClick={handleRefreshStats}
+            disabled={refreshState === 'loading'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              background: refreshState === 'success' ? '#5F8D72' : refreshState === 'error' ? '#A85951' : 'var(--color-bg-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 8, padding: '8px 12px', fontSize: 13,
+              color: refreshState === 'success' || refreshState === 'error' ? '#fff' : 'var(--color-text-muted)',
+              cursor: refreshState === 'loading' ? 'wait' : 'pointer',
+              fontFamily: 'var(--font-input)',
+              transition: 'background 0.2s, color 0.2s',
+            }}
+            title="Trigger stats refresh for all orgs"
+          >
+            <RefreshCw size={14} style={{ animation: refreshState === 'loading' ? 'spin 1s linear infinite' : 'none' }} />
+            {refreshState === 'loading' ? 'Refreshing...' : refreshState === 'success' ? 'Refresh triggered' : refreshState === 'error' ? 'Refresh failed' : 'Refresh Stats'}
+          </button>
+          <span style={{ fontSize: 10, color: 'var(--color-text-subtle)' }}>
+            {lastTriggeredAt
+              ? `Last triggered: ${(() => {
+                  const diff = Math.round((Date.now() - new Date(lastTriggeredAt).getTime()) / 1000);
+                  if (diff < 60) return `${diff}s ago`;
+                  return `${Math.round(diff / 60)}m ago`;
+                })()}`
+              : 'Stats update in ~30 seconds'}
+          </span>
+        </div>
+      </div>
 
       {/* Service health strip */}
       <div style={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-tile)', padding: 20 }}>

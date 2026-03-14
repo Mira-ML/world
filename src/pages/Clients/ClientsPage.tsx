@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useWorldData } from '../../contexts/WorldDataContext';
 import ClientDetailPanel from './ClientDetailPanel';
-import { Search, ChevronRight, EyeOff, Eye, Info } from 'lucide-react';
+import { Search, ChevronRight, EyeOff, Eye, Info, RefreshCw } from 'lucide-react';
 
 const fmtPct = (rate?: number): string => {
   if (rate === undefined || rate === null || rate === 0) return '\u2014';
@@ -32,6 +32,21 @@ const ClientsPage: React.FC = () => {
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
   const [showTombstoned, setShowTombstoned] = useState(false);
   const [tombstoning, setTombstoning] = useState<string | null>(null);
+  const [refreshState, setRefreshState] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [lastTriggeredAt, setLastTriggeredAt] = useState<string | null>(null);
+
+  const handleRefreshStats = useCallback(async () => {
+    setRefreshState('loading');
+    try {
+      const data = await apiFetch('/refresh-stats', { method: 'POST' });
+      setLastTriggeredAt(data.triggeredAt);
+      setRefreshState('success');
+      setTimeout(() => setRefreshState('idle'), 2000);
+    } catch {
+      setRefreshState('error');
+      setTimeout(() => setRefreshState('idle'), 3000);
+    }
+  }, [apiFetch]);
 
   useEffect(() => {
     apiFetch('/clients').then(d => setClients(d.clients ?? [])).catch(e => setError(e.message)).finally(() => setLoading(false));
@@ -64,6 +79,35 @@ const ClientsPage: React.FC = () => {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--color-text-primary)' }}>Clients</h1>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+            <button
+              onClick={handleRefreshStats}
+              disabled={refreshState === 'loading'}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                background: refreshState === 'success' ? '#5F8D72' : refreshState === 'error' ? '#A85951' : 'var(--color-bg-surface)',
+                border: '1px solid var(--color-border)',
+                borderRadius: 8, padding: '8px 12px', fontSize: 13,
+                color: refreshState === 'success' || refreshState === 'error' ? '#fff' : 'var(--color-text-muted)',
+                cursor: refreshState === 'loading' ? 'wait' : 'pointer',
+                fontFamily: 'var(--font-input)',
+                transition: 'background 0.2s, color 0.2s',
+              }}
+              title="Trigger stats refresh for all orgs"
+            >
+              <RefreshCw size={14} style={{ animation: refreshState === 'loading' ? 'spin 1s linear infinite' : 'none' }} />
+              {refreshState === 'loading' ? 'Refreshing...' : refreshState === 'success' ? 'Refresh triggered' : refreshState === 'error' ? 'Refresh failed' : 'Refresh Stats'}
+            </button>
+            <span style={{ fontSize: 10, color: 'var(--color-text-subtle)' }}>
+              {lastTriggeredAt
+                ? `Last triggered: ${(() => {
+                    const diff = Math.round((Date.now() - new Date(lastTriggeredAt).getTime()) / 1000);
+                    if (diff < 60) return `${diff}s ago`;
+                    return `${Math.round(diff / 60)}m ago`;
+                  })()}`
+                : 'Stats update in ~30 seconds'}
+            </span>
+          </div>
           <button
             onClick={() => setShowTombstoned(prev => !prev)}
             style={{
