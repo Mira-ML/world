@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { useWorldData } from '../../contexts/WorldDataContext';
 import ClientDetailPanel from './ClientDetailPanel';
-import { Search, ChevronRight, EyeOff, Eye } from 'lucide-react';
+import { Search, ChevronRight, EyeOff, Eye, Info } from 'lucide-react';
+
+const fmtPct = (rate?: number): string => {
+  if (rate === undefined || rate === null || rate === 0) return '\u2014';
+  return `${(Number(rate) * 100).toFixed(1)}%`;
+};
 
 interface Client {
   orgId: string;
@@ -10,6 +15,9 @@ interface Client {
   conversationsTotal: number;
   conversationsLast30d: number;
   uniqueUsers: number;
+  totalVisits30d?: number;
+  widgetOpenRate?: number;
+  engagementRate?: number;
   status?: string;
   tombstoned?: boolean;
   tombstonedAt?: string;
@@ -96,19 +104,34 @@ const ClientsPage: React.FC = () => {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
-                {['Name', 'Industry', 'Convos (all)', 'Convos (30d)', 'Unique Users', ''].map((h, i) => (
+                {[
+                  { label: 'Name', align: 'left' },
+                  { label: 'Industry', align: 'left' },
+                  { label: 'Convos (all)', align: 'right' },
+                  { label: 'Convos (30d)', align: 'right' },
+                  { label: 'Unique Users', align: 'right' },
+                  { label: 'Visits (30d)', align: 'right', tooltip: 'Page load events in the last 30 days' },
+                  { label: 'Open Rate', align: 'right', tooltip: 'Widget opens / site visits' },
+                  { label: 'Engagement Rate', align: 'right', tooltip: 'Conversations started / widget opens' },
+                  { label: '', align: 'left' },
+                ].map((h, i) => (
                   <th key={i} style={{
-                    padding: '12px 16px', textAlign: i >= 2 && i < 5 ? 'right' : 'left',
+                    padding: '12px 16px', textAlign: h.align as any,
                     fontSize: 11, color: 'var(--color-text-subtle)', fontWeight: 600,
                     textTransform: 'uppercase', letterSpacing: '0.06em',
-                  }}>{h}</th>
+                  }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      {h.label}
+                      {h.tooltip && <Info size={11} style={{ color: 'var(--color-text-subtle)', cursor: 'help' }} title={h.tooltip} />}
+                    </span>
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--color-text-subtle)', fontSize: 14 }}>
+                  <td colSpan={9} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--color-text-subtle)', fontSize: 14 }}>
                     {search ? 'No clients match your search' : 'No clients found'}
                   </td>
                 </tr>
@@ -151,6 +174,9 @@ const ClientsPage: React.FC = () => {
                   <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{client.conversationsTotal.toLocaleString()}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{client.conversationsLast30d.toLocaleString()}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{client.uniqueUsers.toLocaleString()}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{client.totalVisits30d ? client.totalVisits30d.toLocaleString() : '\u2014'}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{fmtPct(client.widgetOpenRate)}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{fmtPct(client.engagementRate)}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
                       {!client.tombstoned && (
