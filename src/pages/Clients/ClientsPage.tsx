@@ -122,7 +122,7 @@ const ClientsPage: React.FC = () => {
                   }}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                       {h.label}
-                      {h.tooltip && <Info size={11} style={{ color: 'var(--color-text-subtle)', cursor: 'help' }} title={h.tooltip} />}
+                      {h.tooltip && <span title={h.tooltip}><Info size={11} style={{ color: 'var(--color-text-subtle)', cursor: 'help' }} /></span>}
                     </span>
                   </th>
                 ))}
