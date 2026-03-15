@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useWorldData } from '../../contexts/WorldDataContext';
-import ClientDetailPanel from './ClientDetailPanel';
-import { Search, ChevronRight, EyeOff, Eye, Info, RefreshCw } from 'lucide-react';
+import ClientDetailModal from './ClientDetailPanel';
+import { Search, EyeOff, Eye, Info, RefreshCw } from 'lucide-react';
 
 const fmtPct = (rate?: number): string => {
   if (rate === undefined || rate === null || rate === 0) return '\u2014';
@@ -154,9 +154,8 @@ const ClientsPage: React.FC = () => {
                   { label: 'Convos (all)', align: 'right' },
                   { label: 'Convos (30d)', align: 'right' },
                   { label: 'Unique Users', align: 'right' },
-                  { label: 'Visits (30d)', align: 'right', tooltip: 'Page load events in the last 30 days' },
                   { label: 'Open Rate', align: 'right', tooltip: 'Widget opens / site visits' },
-                  { label: 'Engagement Rate', align: 'right', tooltip: 'Conversations started / widget opens' },
+                  { label: 'Engagement', align: 'right', tooltip: 'Conversations started / widget opens' },
                   { label: '', align: 'left' },
                 ].map((h, i) => (
                   <th key={i} style={{
@@ -175,7 +174,7 @@ const ClientsPage: React.FC = () => {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--color-text-subtle)', fontSize: 14 }}>
+                  <td colSpan={8} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--color-text-subtle)', fontSize: 14 }}>
                     {search ? 'No clients match your search' : 'No clients found'}
                   </td>
                 </tr>
@@ -209,37 +208,29 @@ const ClientsPage: React.FC = () => {
                         }}>Tombstoned</span>
                       )}
                     </div>
-                    <div style={{
-                      fontSize: 11, color: 'var(--color-text-subtle)', marginTop: 2,
-                      textDecoration: client.tombstoned ? 'line-through' : 'none',
-                    }}>{client.orgId}</div>
                   </td>
                   <td style={{ padding: '12px 16px', color: 'var(--color-text-muted)', textDecoration: client.tombstoned ? 'line-through' : 'none' }}>{client.industry ?? '—'}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{client.conversationsTotal.toLocaleString()}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{client.conversationsLast30d.toLocaleString()}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{client.uniqueUsers.toLocaleString()}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{client.totalVisits30d ? client.totalVisits30d.toLocaleString() : '\u2014'}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{fmtPct(client.widgetOpenRate)}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{fmtPct(client.engagementRate)}</td>
                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 8 }}>
-                      {!client.tombstoned && (
-                        <button
-                          onClick={(e) => handleTombstone(client.orgId, e)}
-                          disabled={tombstoning === client.orgId}
-                          style={{
-                            background: 'transparent', border: '1px solid var(--color-border)',
-                            borderRadius: 6, padding: '4px 10px', fontSize: 11,
-                            color: 'var(--color-text-muted)', cursor: 'pointer',
-                            fontFamily: 'var(--font-input)', opacity: tombstoning === client.orgId ? 0.5 : 1,
-                          }}
-                          title="Tombstone this client"
-                        >
-                          {tombstoning === client.orgId ? '…' : 'Tombstone'}
-                        </button>
-                      )}
-                      <ChevronRight size={14} style={{ color: 'var(--color-text-subtle)' }} />
-                    </div>
+                    {!client.tombstoned && (
+                      <button
+                        onClick={(e) => handleTombstone(client.orgId, e)}
+                        disabled={tombstoning === client.orgId}
+                        style={{
+                          background: 'transparent', border: '1px solid var(--color-border)',
+                          borderRadius: 6, padding: '4px 10px', fontSize: 11,
+                          color: 'var(--color-text-muted)', cursor: 'pointer',
+                          fontFamily: 'var(--font-input)', opacity: tombstoning === client.orgId ? 0.5 : 1,
+                        }}
+                        title="Tombstone this client"
+                      >
+                        {tombstoning === client.orgId ? '…' : 'Tombstone'}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -248,7 +239,7 @@ const ClientsPage: React.FC = () => {
         </div>
       )}
 
-      {selectedOrgId && <ClientDetailPanel orgId={selectedOrgId} onClose={() => setSelectedOrgId(null)} />}
+      {selectedOrgId && <ClientDetailModal orgId={selectedOrgId} onClose={() => setSelectedOrgId(null)} />}
     </div>
   );
 };
