@@ -5,6 +5,7 @@ phases:
     runtime-versions:
       nodejs: 22.x
     commands:
+      - aws codeartifact login --tool npm --repository mira-ui-common --domain mira --domain-owner 289979559793 --region us-east-1
       - npm install
       - npm install -D terser
   build:
