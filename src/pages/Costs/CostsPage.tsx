@@ -5,10 +5,16 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 interface ServiceCost { service: string; cost: number; }
 interface DailyPoint { date: string; cost: number; }
 interface AwsCostData { currentMonth: number; lastMonth: number; byService: ServiceCost[]; daily: DailyPoint[]; }
-interface AnthropicCostData { currentMonth: number; daily: DailyPoint[]; }
+interface ModelCost { model: string; cost: number; inputTokens: number; outputTokens: number; }
+interface AnthropicCostData { currentMonth: number; byModel?: ModelCost[]; daily: DailyPoint[]; error?: string; }
 interface AttributionRow { orgId: string; orgName: string; inputTokens: number; outputTokens: number; estimatedCost: number; }
 
 const fmt$ = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const fmtTokens = (n: number) => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+  return n.toLocaleString();
+};
 
 const card: React.CSSProperties = {
   background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
@@ -59,6 +65,9 @@ const CostsPage: React.FC = () => {
           <div style={{ fontSize: 28, fontWeight: 600, color: 'var(--color-text-primary)' }}>
             {anthropicData ? fmt$(anthropicData.currentMonth) : '—'}
           </div>
+          {anthropicData?.error && (
+            <div style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginTop: 6 }}>API error — showing cached data</div>
+          )}
         </div>
       </div>
 
@@ -89,6 +98,51 @@ const CostsPage: React.FC = () => {
                 formatter={(v: number) => [fmt$(v), 'Cost']}
               />
               <Bar dataKey="cost" fill="var(--color-accent)" radius={[2, 2, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {anthropicData?.byModel && anthropicData.byModel.length > 0 && (
+        <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+          <div style={{ ...sectionLabel, padding: '16px 20px 12px', borderBottom: '1px solid var(--color-border)', marginBottom: 0 }}>
+            Anthropic Cost by Model
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+                {['Model', 'Input Tokens', 'Output Tokens', 'Cost'].map((h, i) => (
+                  <th key={i} style={{ padding: '10px 16px', textAlign: i === 0 ? 'left' : 'right', fontSize: 11, color: 'var(--color-text-subtle)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {anthropicData.byModel.map(row => (
+                <tr key={row.model} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                  <td style={{ padding: '10px 16px', color: 'var(--color-text-primary)', fontWeight: 500 }}>{row.model}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', color: 'var(--color-text-muted)' }}>{fmtTokens(row.inputTokens)}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', color: 'var(--color-text-muted)' }}>{fmtTokens(row.outputTokens)}</td>
+                  <td style={{ padding: '10px 16px', textAlign: 'right', fontWeight: 500, color: 'var(--color-text-primary)' }}>{fmt$(row.cost)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {anthropicData?.daily && anthropicData.daily.length > 0 && (
+        <div style={card}>
+          <div style={sectionLabel}>Daily Anthropic Cost (Current Month)</div>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={anthropicData.daily} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--color-text-subtle)' }} tickLine={false} axisLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: 'var(--color-text-subtle)' }} tickLine={false} axisLine={false} tickFormatter={v => `$${v}`} />
+              <Tooltip
+                contentStyle={{ background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 8, fontSize: 12 }}
+                formatter={(v: number) => [fmt$(v), 'Cost']}
+              />
+              <Bar dataKey="cost" fill="#C9956B" radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
