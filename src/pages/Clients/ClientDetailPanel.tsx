@@ -28,10 +28,34 @@ interface PromptSection {
   content: string;
 }
 
+// Phase 2 will add partner agent rules here with ruleScope="partner_agent#{agentId}"
+interface DecorumRules {
+  staffPresentBehavior: string;
+  staffOfferTrigger: string;
+  staffDepartureMessage: string;
+}
+
+const DECORUM_DEFAULTS: DecorumRules = {
+  staffPresentBehavior: 'muted_listening',
+  staffOfferTrigger: 'contextual',
+  staffDepartureMessage: '',
+};
+
+const BEHAVIOR_OPTIONS = [
+  { value: 'muted_listening', label: 'Muted listening' },
+  { value: 'silent', label: 'Silent' },
+  { value: 'active', label: 'Active' },
+];
+
+const TRIGGER_OPTIONS = [
+  { value: 'explicit_request_only', label: 'Explicit request only' },
+  { value: 'contextual', label: 'Contextual (agent judgment)' },
+];
+
 interface Props { orgId: string; onClose: () => void; }
 
 const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
-  const { apiFetch } = useWorldData();
+  const { apiFetch, baseApiFetch } = useWorldData();
   const [detail, setDetail] = useState<ClientDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [newNote, setNewNote] = useState('');
@@ -56,6 +80,13 @@ const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
   const [promptAgentName, setPromptAgentName] = useState('');
   const [promptLoading, setPromptLoading] = useState(false);
 
+  // Decorum rules
+  const [decorumRules, setDecorumRules] = useState<DecorumRules>({ ...DECORUM_DEFAULTS });
+  const [decorumIsDefault, setDecorumIsDefault] = useState(true);
+  const [decorumLoading, setDecorumLoading] = useState(false);
+  const [decorumSaving, setDecorumSaving] = useState(false);
+  const [decorumDirty, setDecorumDirty] = useState(false);
+
   const load = () => {
     setLoading(true);
     apiFetch(`/clients/${orgId}`).then(setDetail).catch(() => {}).finally(() => setLoading(false));
@@ -75,6 +106,23 @@ const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
       .then(d => setIntegrations(d.integrations ?? []))
       .catch(() => {})
       .finally(() => setIntegrationsLoading(false));
+    // Load decorum rules
+    setDecorumLoading(true);
+    baseApiFetch(`/decorum/rules`, { headers: { 'X-Internal-Org-Id': orgId } })
+      .then(d => {
+        setDecorumRules({
+          staffPresentBehavior: d.staffPresentBehavior ?? DECORUM_DEFAULTS.staffPresentBehavior,
+          staffOfferTrigger: d.staffOfferTrigger ?? DECORUM_DEFAULTS.staffOfferTrigger,
+          staffDepartureMessage: d.staffDepartureMessage ?? DECORUM_DEFAULTS.staffDepartureMessage,
+        });
+        setDecorumIsDefault(false);
+        setDecorumDirty(false);
+      })
+      .catch(() => {
+        setDecorumRules({ ...DECORUM_DEFAULTS });
+        setDecorumIsDefault(true);
+      })
+      .finally(() => setDecorumLoading(false));
   }, [orgId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load noteworthy prompt lazily when expanded
@@ -113,6 +161,24 @@ const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
       setNewNote('');
       load();
     } catch (e) {} finally { setSaving(false); }
+  };
+
+  const handleDecorumChange = (field: keyof DecorumRules, value: string) => {
+    setDecorumRules(prev => ({ ...prev, [field]: value }));
+    setDecorumDirty(true);
+  };
+
+  const handleDecorumSave = async () => {
+    setDecorumSaving(true);
+    try {
+      await baseApiFetch(`/decorum/rules`, {
+        method: 'PUT',
+        headers: { 'X-Internal-Org-Id': orgId },
+        body: JSON.stringify({ ruleScope: 'staff', ...decorumRules }),
+      });
+      setDecorumIsDefault(false);
+      setDecorumDirty(false);
+    } catch (e) {} finally { setDecorumSaving(false); }
   };
 
   // Close on Escape key
@@ -321,6 +387,97 @@ const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
                   </div>
                 );
               })()}
+
+              {/* ── Decorum Rules (Phase 1: staff scope) ── */}
+              <div style={section}>
+                <div style={label}>Decorum Rules</div>
+                {decorumLoading ? (
+                  <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Loading…</div>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                      {/* Staff present behavior */}
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Staff present behavior</div>
+                          {decorumIsDefault && <span style={{ fontSize: 10, color: 'var(--color-text-subtle)', fontStyle: 'italic' }}>defaults</span>}
+                        </div>
+                        <select
+                          value={decorumRules.staffPresentBehavior}
+                          onChange={e => handleDecorumChange('staffPresentBehavior', e.target.value)}
+                          style={{
+                            width: '100%', padding: '6px 10px', fontSize: 13,
+                            background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
+                            borderRadius: 6, color: 'var(--color-text-primary)', fontFamily: 'var(--font-input)',
+                            outline: 'none', cursor: 'pointer',
+                          }}
+                        >
+                          {BEHAVIOR_OPTIONS.map(o => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Staff offer trigger */}
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Staff offer trigger</div>
+                          {decorumIsDefault && <span style={{ fontSize: 10, color: 'var(--color-text-subtle)', fontStyle: 'italic' }}>defaults</span>}
+                        </div>
+                        <select
+                          value={decorumRules.staffOfferTrigger}
+                          onChange={e => handleDecorumChange('staffOfferTrigger', e.target.value)}
+                          style={{
+                            width: '100%', padding: '6px 10px', fontSize: 13,
+                            background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
+                            borderRadius: 6, color: 'var(--color-text-primary)', fontFamily: 'var(--font-input)',
+                            outline: 'none', cursor: 'pointer',
+                          }}
+                        >
+                          {TRIGGER_OPTIONS.map(o => (
+                            <option key={o.value} value={o.value}>{o.label}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Staff departure message */}
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>Staff departure message</div>
+                          {decorumIsDefault && <span style={{ fontSize: 10, color: 'var(--color-text-subtle)', fontStyle: 'italic' }}>defaults</span>}
+                        </div>
+                        <input
+                          type="text"
+                          value={decorumRules.staffDepartureMessage}
+                          onChange={e => handleDecorumChange('staffDepartureMessage', e.target.value)}
+                          placeholder="e.g. 'I'm back if you need anything else!'"
+                          style={{
+                            width: '100%', padding: '6px 10px', fontSize: 13,
+                            background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
+                            borderRadius: 6, color: 'var(--color-text-primary)', fontFamily: 'var(--font-input)',
+                            outline: 'none', boxSizing: 'border-box',
+                          }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Save button */}
+                    <button
+                      onClick={handleDecorumSave}
+                      disabled={decorumSaving || !decorumDirty}
+                      style={{
+                        marginTop: 14, padding: '6px 20px', fontSize: 13, fontWeight: 600,
+                        background: 'var(--color-accent)', color: '#FFFFFF', border: 'none',
+                        borderRadius: 6, cursor: decorumDirty ? 'pointer' : 'default',
+                        opacity: decorumSaving || !decorumDirty ? 0.45 : 1,
+                        fontFamily: 'var(--font-input)',
+                      }}
+                    >
+                      {decorumSaving ? 'Saving…' : 'Save'}
+                    </button>
+                  </>
+                )}
+              </div>
 
               {/* ── Noteworthy Logic ─────────────────────── */}
               <div
