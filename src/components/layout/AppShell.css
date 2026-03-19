@@ -225,7 +225,40 @@
 
 .app-shell__user-menu-backdrop { position: fixed; inset: 0; z-index: 100; }
 
-/* ===== TOPNAV (world has no sub-tabs, just title + user) ===== */
+/* ===== SUB-TABS ===== */
+.app-shell__sub-tabs {
+  display: flex;
+  gap: 0;
+  margin-left: 16px;
+  height: 100%;
+  align-items: stretch;
+}
+
+.app-shell__sub-tab {
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  font-family: var(--font-primary);
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.app-shell__sub-tab:hover {
+  color: var(--color-text-primary);
+}
+
+.app-shell__sub-tab--active {
+  color: var(--color-accent);
+  font-weight: 600;
+  border-bottom-color: var(--color-accent);
+}
+
+/* ===== TOPNAV ===== */
 .app-shell__topnav {
   height: var(--topnav-height, 56px);
   min-height: var(--topnav-height, 56px);

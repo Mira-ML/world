@@ -4,16 +4,29 @@ import { useAuth0 } from '@auth0/auth0-react';
 import { ChevronLeft, ChevronRight, ChevronDown, LogOut, Menu } from 'lucide-react';
 import './AppShell.css';
 
+interface SubTab {
+  id: string;
+  label: string;
+  path: string;
+}
+
 const NAV_ITEMS = [
   { to: '/', label: 'OVERVIEW', end: true },
   { to: '/clients', label: 'CLIENTS', end: false },
   { to: '/costs', label: 'COSTS', end: false },
-  { to: '/prompts', label: 'PROMPTS', end: false },
+  { to: '/playbook', label: 'PLAYBOOK', end: false },
   { to: '/network', label: 'NETWORK', end: false },
   { to: '/flags', label: 'FEATURE FLAGS', end: false },
   { to: '/widget-flags', label: 'WIDGET FLAGS', end: false },
   { to: '/cards', label: 'CARDS', end: false },
 ];
+
+const sectionSubTabs: Record<string, SubTab[]> = {
+  playbook: [
+    { id: 'prompts', label: 'Prompts', path: '/playbook' },
+    { id: 'segments', label: 'Segments', path: '/playbook/segments' },
+  ],
+};
 
 const WORDMARK = 'https://s3.us-east-2.amazonaws.com/beta.mira.ml/terraWordmark.png';
 const WORDMARK_VERTICAL = 'https://s3.us-east-2.amazonaws.com/beta.mira.ml/WORDMARK_HORIZONTAL_(PURPLE).svg';
@@ -28,9 +41,14 @@ const AppShell: React.FC = () => {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const location = useLocation();
 
-  const sectionLabel = NAV_ITEMS.find(n =>
+  const activeNav = NAV_ITEMS.find(n =>
     n.end ? location.pathname === '/' : location.pathname.startsWith(n.to)
-  )?.label ?? 'WORLD';
+  );
+  const sectionLabel = activeNav?.label ?? 'WORLD';
+
+  // Determine active section key for sub-tabs (e.g., "playbook")
+  const sectionKey = activeNav?.to?.replace('/', '') || '';
+  const subTabs = sectionSubTabs[sectionKey] || [];
 
   return (
     <div className="app-shell">
@@ -83,6 +101,25 @@ const AppShell: React.FC = () => {
               <span className="app-shell__hamburger" />
             </button>
             <span className="app-shell__section-title">{sectionLabel}</span>
+            {subTabs.length > 0 && (
+              <nav className="app-shell__sub-tabs">
+                {subTabs.map(tab => {
+                  const isActive = tab.path === '/playbook'
+                    ? location.pathname === '/playbook' || location.pathname === '/playbook/'
+                    : location.pathname.startsWith(tab.path);
+                  return (
+                    <NavLink
+                      key={tab.id}
+                      to={tab.path}
+                      end={tab.path === '/playbook'}
+                      className={`app-shell__sub-tab${isActive ? ' app-shell__sub-tab--active' : ''}`}
+                    >
+                      {tab.label}
+                    </NavLink>
+                  );
+                })}
+              </nav>
+            )}
           </div>
 
           <div className="app-shell__user-menu">
