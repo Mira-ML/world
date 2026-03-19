@@ -165,10 +165,9 @@ const SegmentsPage: React.FC = () => {
     setBackfilling(true);
     setBackfillResult(null);
     try {
-      const result = await baseApiFetch('/segments/backfill', {
+      const result = await apiFetch('/segments/backfill', {
         method: 'POST',
-        headers: { 'X-Internal-Org-Id': selectedOrg },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ orgId: selectedOrg }),
       });
       setBackfillResult(result);
       // Refresh segments to get updated counts
@@ -185,29 +184,23 @@ const SegmentsPage: React.FC = () => {
     if (!window.confirm('Re-classify users for ALL organizations? This may take a while.')) return;
     setBackfilling(true);
     setBackfillResult(null);
-    const results: BackfillResult[] = [];
-    for (const org of orgs) {
-      try {
-        const result = await baseApiFetch('/segments/backfill', {
-          method: 'POST',
-          headers: { 'X-Internal-Org-Id': org.orgId },
-          body: JSON.stringify({}),
-        });
-        results.push(result);
-      } catch (e: any) {
-        console.error(`Backfill failed for ${org.orgName}:`, e);
-      }
+    try {
+      const result = await apiFetch('/segments/backfill-all', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      setBackfillResult({
+        orgId: 'ALL',
+        totalPersons: result.totalPersons || 0,
+        reassigned: result.totalReassigned || 0,
+        segmentDistribution: {},
+      });
+      await fetchSegments();
+    } catch (e: any) {
+      alert('Backfill all failed: ' + e.message);
+    } finally {
+      setBackfilling(false);
     }
-    const totalPersons = results.reduce((s, r) => s + r.totalPersons, 0);
-    const totalReassigned = results.reduce((s, r) => s + r.reassigned, 0);
-    setBackfillResult({
-      orgId: 'ALL',
-      totalPersons,
-      reassigned: totalReassigned,
-      segmentDistribution: {},
-    });
-    await fetchSegments();
-    setBackfilling(false);
   };
 
   const selectedOrgName = orgs.find(o => o.orgId === selectedOrg)?.orgName || '';
