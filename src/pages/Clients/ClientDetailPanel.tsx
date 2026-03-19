@@ -41,6 +41,10 @@ const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [integrationsLoading, setIntegrationsLoading] = useState(false);
 
+  // Outcomes
+  const [outcomes, setOutcomes] = useState<{ outcomeCounts: Record<string, number>; conversionRate: number; totalScored: number } | null>(null);
+  const [outcomesLoading, setOutcomesLoading] = useState(false);
+
   // Noteworthy Logic pill
   const [noteworthyOpen, setNoteworthyOpen] = useState(false);
   const [noteworthyPrompt, setNoteworthyPrompt] = useState<string | null>(null);
@@ -59,6 +63,12 @@ const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
 
   useEffect(() => {
     load();
+    // Load outcomes
+    setOutcomesLoading(true);
+    apiFetch(`/outcomes?orgId=${orgId}`)
+      .then(setOutcomes)
+      .catch(() => {})
+      .finally(() => setOutcomesLoading(false));
     // Load integrations
     setIntegrationsLoading(true);
     apiFetch(`/clients/${orgId}/integrations`)
@@ -204,6 +214,63 @@ const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
                       </div>
                     ))}
                   </div>
+                )}
+              </div>
+
+              {/* ── Outcomes ────────────────────────────── */}
+              <div style={section}>
+                <div style={label}>Outcomes</div>
+                {outcomesLoading ? (
+                  <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Loading…</div>
+                ) : outcomes && outcomes.totalScored > 0 ? (() => {
+                  const oc = outcomes.outcomeCounts;
+                  const total = outcomes.totalScored;
+                  const segments: { key: string; label: string; count: number; color: string }[] = [
+                    { key: 'converted',  label: 'Converted',  count: oc.converted ?? 0,  color: '#2e7d32' },
+                    { key: 'engaged',    label: 'Engaged',     count: oc.engaged ?? 0,    color: '#00695c' },
+                    { key: 'browsed',    label: 'Browsed',     count: oc.browsed ?? 0,    color: '#9e9e9e' },
+                    { key: 'bounced',    label: 'Bounced',     count: oc.bounced ?? 0,    color: '#f57f17' },
+                    { key: 'frustrated', label: 'Frustrated',  count: oc.frustrated ?? 0, color: '#c62828' },
+                  ];
+                  return (
+                    <>
+                      <div style={{ display: 'flex', height: 22, borderRadius: 4, overflow: 'hidden', marginBottom: 10 }}>
+                        {segments.filter(s => s.count > 0).map(s => (
+                          <div
+                            key={s.key}
+                            title={`${s.label}: ${s.count} (${((s.count / total) * 100).toFixed(1)}%)`}
+                            style={{
+                              flex: s.count, background: s.color,
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              color: '#fff', fontSize: 10, fontWeight: 600, minWidth: s.count > 0 ? 18 : 0,
+                            }}
+                          >
+                            {((s.count / total) * 100) >= 10 ? s.label : ''}
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
+                        {segments.map(s => (
+                          <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
+                            <span style={{ width: 8, height: 8, borderRadius: 2, background: s.color }} />
+                            <span style={{ color: 'var(--color-text-primary)' }}>{s.label}</span>
+                            <span style={{ color: 'var(--color-text-subtle)', fontWeight: 500 }}>{s.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                        <span style={{ fontSize: 18, fontWeight: 700, color: '#2e7d32' }}>
+                          {(outcomes.conversionRate * 100).toFixed(1)}%
+                        </span>
+                        <span style={{ fontSize: 12, color: 'var(--color-text-primary)' }}>conversion rate</span>
+                        <span style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>
+                          ({total.toLocaleString()} scored)
+                        </span>
+                      </div>
+                    </>
+                  );
+                })() : (
+                  <div style={{ fontSize: 13, color: 'var(--color-text-subtle)' }}>No outcome data available</div>
                 )}
               </div>
 
