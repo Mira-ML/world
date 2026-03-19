@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useWorldData } from '../../contexts/WorldDataContext';
 import { X, Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 
 interface Flag { flagKey: string; scopeOrg: string; value: string | boolean; updatedAt: string; }
 interface Note { orgId: string; createdAt: string; noteBody: string; createdBy: string; }
@@ -12,7 +13,15 @@ interface BillingInfo {
   currentPeriodStart?: number;
   currentPeriodEnd?: number;
 }
-interface ClientDetail { orgId: string; orgName: string; industry?: string; status?: string; agentId?: string; notes: Note[]; flags: Flag[]; billing?: BillingInfo; }
+interface TrendPoint { date: string; conversations: number; newPersons: number; }
+interface NoteConvo { conversationId: string; closedAt: string; outcome: string; summary: string; personDisplayName: string; }
+interface ClientDetail {
+  orgId: string; orgName: string; industry?: string; status?: string; agentId?: string;
+  conversationsMtd?: number; conversationsLastMonth?: number; totalPersons?: number;
+  trend?: TrendPoint[]; segmentBreakdown?: Record<string, number>;
+  billingStatus?: string; lastActive?: string; noteworthy?: NoteConvo[];
+  notes: Note[]; flags: Flag[]; billing?: BillingInfo;
+}
 
 interface Integration {
   key: string;
@@ -244,6 +253,94 @@ const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
                   ))}
                 </div>
               </div>
+
+              {/* ── Stats (from daily snapshots) ────────── */}
+              <div style={section}>
+                <div style={label}>Performance</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                      {(detail.conversationsMtd ?? 0).toLocaleString()}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>Conversations MTD <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>live</span></div>
+                    {detail.conversationsLastMonth != null && (() => {
+                      const diff = (detail.conversationsMtd ?? 0) - detail.conversationsLastMonth;
+                      if (diff === 0) return null;
+                      const arrow = diff > 0 ? '\u2191' : '\u2193';
+                      const color = diff > 0 ? '#5F8D72' : '#A85951';
+                      return <div style={{ fontSize: 12, color, fontWeight: 600, marginTop: 2 }}>{arrow}{Math.abs(diff)} vs last month</div>;
+                    })()}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 22, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                      {(detail.totalPersons ?? 0).toLocaleString()}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>Total Persons <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>as of yesterday</span></div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                      {detail.lastActive || '—'}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>Last Active</div>
+                  </div>
+                </div>
+                {/* Trend chart */}
+                {detail.trend && detail.trend.length >= 2 && (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginBottom: 6 }}>
+                      Last 30 days <span style={{ fontStyle: 'italic', color: 'var(--color-text-muted)' }}>as of yesterday</span>
+                    </div>
+                    <ResponsiveContainer width="100%" height={100}>
+                      <LineChart data={detail.trend}>
+                        <XAxis dataKey="date" tick={false} axisLine={false} />
+                        <Tooltip
+                          contentStyle={{ fontSize: 12, background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 6 }}
+                          formatter={(v: number, name: string) => [v, name === 'conversations' ? 'Conversations' : 'New Persons']}
+                          labelFormatter={(l: string) => l}
+                        />
+                        <Line type="monotone" dataKey="conversations" stroke="var(--color-accent)" strokeWidth={2} dot={false} />
+                        <Line type="monotone" dataKey="newPersons" stroke="#CCA33B" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+                {/* Segment breakdown */}
+                {detail.segmentBreakdown && Object.keys(detail.segmentBreakdown).length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginBottom: 6 }}>Segment Breakdown (yesterday)</div>
+                    <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      {Object.entries(detail.segmentBreakdown).map(([seg, count]) => (
+                        <div key={seg} style={{ fontSize: 12 }}>
+                          <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{seg}</span>
+                          <span style={{ color: 'var(--color-text-subtle)', marginLeft: 4 }}>{count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Noteworthy Conversations ──────────── */}
+              {detail.noteworthy && detail.noteworthy.length > 0 && (
+                <div style={section}>
+                  <div style={label}>Noteworthy Conversations</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {detail.noteworthy.map(c => (
+                      <div key={c.conversationId} style={{ background: 'var(--color-bg-primary)', borderRadius: 8, padding: '10px 14px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 }}>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                            {c.personDisplayName || 'Guest'}
+                          </span>
+                          <span style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>
+                            {c.closedAt?.slice(0, 10)} · {c.outcome}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.5 }}>{c.summary}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* ── Integrations ──────────────────────────── */}
               <div style={section}>

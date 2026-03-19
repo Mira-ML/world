@@ -1,27 +1,74 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useWorldData } from '../../contexts/WorldDataContext';
 import ClientDetailModal from './ClientDetailPanel';
-import { Search, EyeOff, Eye, Info, RefreshCw } from 'lucide-react';
+import { Search, EyeOff, Eye, RefreshCw } from 'lucide-react';
+import { LineChart, Line, ResponsiveContainer } from 'recharts';
 
-const fmtPct = (rate?: number): string => {
-  if (rate === undefined || rate === null || rate === 0) return '\u2014';
-  return `${(Number(rate) * 100).toFixed(1)}%`;
-};
+interface TrendPoint {
+  date: string;
+  conversations: number;
+  newPersons: number;
+}
 
 interface Client {
   orgId: string;
-  orgName: string;
+  brandName: string;
   industry?: string;
-  conversationsTotal: number;
-  conversationsLast30d: number;
-  uniqueUsers: number;
-  totalVisits30d?: number;
-  widgetOpenRate?: number;
-  engagementRate?: number;
-  status?: string;
+  conversationsMtd: number;
+  conversationsLastMonth: number;
+  totalPersons: number;
+  trend: TrendPoint[];
+  billingStatus: string;
+  lastActive: string;
   tombstoned?: boolean;
   tombstonedAt?: string;
 }
+
+const billingBadge = (status: string) => {
+  const colors: Record<string, { bg: string; fg: string }> = {
+    active: { bg: 'rgba(95,141,114,0.15)', fg: '#5F8D72' },
+    canceled: { bg: 'rgba(168,89,81,0.15)', fg: '#A85951' },
+    cancelled: { bg: 'rgba(168,89,81,0.15)', fg: '#A85951' },
+    past_due: { bg: 'rgba(204,163,59,0.15)', fg: '#CCA33B' },
+  };
+  const c = colors[status] || { bg: 'rgba(120,120,120,0.1)', fg: 'var(--color-text-muted)' };
+  return (
+    <span style={{
+      fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4,
+      background: c.bg, color: c.fg, textTransform: 'capitalize',
+    }}>
+      {status || 'none'}
+    </span>
+  );
+};
+
+const delta = (mtd: number, last: number) => {
+  const diff = mtd - last;
+  if (diff === 0) return null;
+  const arrow = diff > 0 ? '\u2191' : '\u2193';
+  const color = diff > 0 ? '#5F8D72' : '#A85951';
+  return <span style={{ fontSize: 11, color, fontWeight: 600, marginLeft: 4 }}>{arrow}{Math.abs(diff)}</span>;
+};
+
+const Sparkline: React.FC<{ data: TrendPoint[] }> = ({ data }) => {
+  // Last 14 days
+  const recent = data.slice(-14);
+  if (recent.length < 2) return <span style={{ color: 'var(--color-text-subtle)', fontSize: 11 }}>—</span>;
+  return (
+    <ResponsiveContainer width={80} height={28}>
+      <LineChart data={recent}>
+        <Line
+          type="monotone"
+          dataKey="conversations"
+          stroke="var(--color-accent)"
+          strokeWidth={1.5}
+          dot={false}
+          isAnimationActive={false}
+        />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+};
 
 const ClientsPage: React.FC = () => {
   const { apiFetch } = useWorldData();
@@ -69,7 +116,7 @@ const ClientsPage: React.FC = () => {
   const filtered = clients
     .filter(c => showTombstoned || !c.tombstoned)
     .filter(c =>
-      c.orgName?.toLowerCase().includes(search.toLowerCase()) ||
+      c.brandName?.toLowerCase().includes(search.toLowerCase()) ||
       c.orgId?.toLowerCase().includes(search.toLowerCase()) ||
       c.industry?.toLowerCase().includes(search.toLowerCase())
     );
@@ -105,7 +152,7 @@ const ClientsPage: React.FC = () => {
                     if (diff < 60) return `${diff}s ago`;
                     return `${Math.round(diff / 60)}m ago`;
                   })()}`
-                : 'Stats update in ~30 seconds'}
+                : 'Trend data as of yesterday'}
             </span>
           </div>
           <button
@@ -149,13 +196,12 @@ const ClientsPage: React.FC = () => {
             <thead>
               <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
                 {[
-                  { label: 'Name', align: 'left' },
-                  { label: 'Industry', align: 'left' },
-                  { label: 'Convos (all)', align: 'right' },
-                  { label: 'Convos (30d)', align: 'right' },
-                  { label: 'Unique Users', align: 'right' },
-                  { label: 'Open Rate', align: 'right', tooltip: 'Widget opens / site visits' },
-                  { label: 'Engagement', align: 'right', tooltip: 'Conversations started / widget opens' },
+                  { label: 'Brand', align: 'left' },
+                  { label: 'Convos MTD', align: 'right' },
+                  { label: 'Persons', align: 'right' },
+                  { label: 'Billing', align: 'center' },
+                  { label: 'Last 14d', align: 'center' },
+                  { label: 'Last Active', align: 'right' },
                   { label: '', align: 'left' },
                 ].map((h, i) => (
                   <th key={i} style={{
@@ -163,10 +209,7 @@ const ClientsPage: React.FC = () => {
                     fontSize: 11, color: 'var(--color-text-subtle)', fontWeight: 600,
                     textTransform: 'uppercase', letterSpacing: '0.06em',
                   }}>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                      {h.label}
-                      {h.tooltip && <span title={h.tooltip}><Info size={11} style={{ color: 'var(--color-text-subtle)', cursor: 'help' }} /></span>}
-                    </span>
+                    {h.label}
                   </th>
                 ))}
               </tr>
@@ -174,7 +217,7 @@ const ClientsPage: React.FC = () => {
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={8} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--color-text-subtle)', fontSize: 14 }}>
+                  <td colSpan={7} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--color-text-subtle)', fontSize: 14 }}>
                     {search ? 'No clients match your search' : 'No clients found'}
                   </td>
                 </tr>
@@ -198,7 +241,7 @@ const ClientsPage: React.FC = () => {
                       textDecoration: client.tombstoned ? 'line-through' : 'none',
                       display: 'flex', alignItems: 'center', gap: 8,
                     }}>
-                      {client.orgName || '—'}
+                      {client.brandName || '—'}
                       {client.tombstoned && (
                         <span style={{
                           fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
@@ -208,13 +251,30 @@ const ClientsPage: React.FC = () => {
                         }}>Tombstoned</span>
                       )}
                     </div>
+                    {client.industry && (
+                      <div style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginTop: 2 }}>{client.industry}</div>
+                    )}
                   </td>
-                  <td style={{ padding: '12px 16px', color: 'var(--color-text-muted)', textDecoration: client.tombstoned ? 'line-through' : 'none' }}>{client.industry ?? '—'}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{client.conversationsTotal.toLocaleString()}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{client.conversationsLast30d.toLocaleString()}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{client.uniqueUsers.toLocaleString()}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{fmtPct(client.widgetOpenRate)}</td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>{fmtPct(client.engagementRate)}</td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                    <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>
+                      {client.conversationsMtd.toLocaleString()}
+                    </span>
+                    {delta(client.conversationsMtd, client.conversationsLastMonth)}
+                    <div style={{ fontSize: 10, color: 'var(--color-text-subtle)', marginTop: 1 }}>live</div>
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-primary)' }}>
+                    {client.totalPersons.toLocaleString()}
+                    <div style={{ fontSize: 10, color: 'var(--color-text-subtle)', marginTop: 1 }}>as of yesterday</div>
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                    {billingBadge(client.billingStatus)}
+                  </td>
+                  <td style={{ padding: '12px 8px', textAlign: 'center' }}>
+                    <Sparkline data={client.trend} />
+                  </td>
+                  <td style={{ padding: '12px 16px', textAlign: 'right', color: 'var(--color-text-muted)', fontSize: 13 }}>
+                    {client.lastActive || '—'}
+                  </td>
                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                     {!client.tombstoned && (
                       <button
