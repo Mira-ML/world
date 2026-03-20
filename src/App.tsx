@@ -10,6 +10,7 @@ import ClientsPage from './pages/Clients/ClientsPage';
 import CostsPage from './pages/Costs/CostsPage';
 import PromptsPage from './pages/Prompts/PromptsPage';
 import SegmentsPage from './pages/Playbook/SegmentsPage';
+import FunnelConfigPage from './pages/Playbook/FunnelConfigPage';
 import NetworkPage from './pages/Network/NetworkPage';
 import FeatureFlagsPage from './pages/FeatureFlags/FeatureFlagsPage';
 import WidgetFlagsPage from './pages/WidgetFlags/WidgetFlagsPage';
@@ -28,6 +29,7 @@ const App: React.FC = () => (
               {/* Playbook section — sub-tabs: Prompts | Segments */}
               <Route path="playbook" element={<PromptsPage />} />
               <Route path="playbook/segments" element={<SegmentsPage />} />
+              <Route path="playbook/funnel" element={<FunnelConfigPage />} />
               {/* Legacy redirect */}
               <Route path="prompts" element={<Navigate to="/playbook" replace />} />
               <Route path="network" element={<NetworkPage />} />

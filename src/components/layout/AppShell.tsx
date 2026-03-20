@@ -25,6 +25,7 @@ const sectionSubTabs: Record<string, SubTab[]> = {
   playbook: [
     { id: 'prompts', label: 'Prompts', path: '/playbook' },
     { id: 'segments', label: 'Segments', path: '/playbook/segments' },
+    { id: 'funnel', label: 'Funnel', path: '/playbook/funnel' },
   ],
 };
 
