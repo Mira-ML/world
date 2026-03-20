@@ -11,7 +11,7 @@ export const FALLBACK_BRAND_COLORS: BrandColors = {
 };
 
 export type FieldSource = 'agent-generated' | 'integration' | 'brand-settings' | 'partner-profile';
-export type CardSource = 'Shopify' | 'Network' | 'Skill';
+export type CardSource = 'Shopify' | 'Network' | 'Skill' | 'Staff';
 
 export interface CardFieldDefinition {
   name: string;
@@ -47,6 +47,7 @@ export const CARD_SOURCE_COLORS: Record<CardSource, { bg: string; fg: string }> 
   Shopify: { bg: 'rgba(16,185,129,0.12)', fg: '#059669' },
   Network: { bg: 'rgba(245,158,11,0.12)', fg: '#d97706' },
   Skill: { bg: 'rgba(99,102,241,0.12)', fg: '#6366f1' },
+  Staff: { bg: 'rgba(236,72,153,0.12)', fg: '#db2777' },
 };
 
 export const CARD_DEFINITIONS: CardDefinition[] = [
@@ -156,6 +157,36 @@ export const CARD_DEFINITIONS: CardDefinition[] = [
         { name: 'checkout', label: 'Check-out', type: 'date', required: true },
         { name: 'guests', label: 'Guests', type: 'number', required: true },
       ],
+    },
+  },
+  {
+    id: 'staff_introduction',
+    name: 'Staff Joined',
+    description: 'Notifies the visitor that a staff member has joined the conversation',
+    triggerHint: 'Shown when a staff member clicks "Join" from the client dashboard live view',
+    sourceBadge: 'Staff',
+    fields: [
+      { name: 'staffName', mockValue: 'Sarah', source: 'brand-settings' },
+      { name: 'message', mockValue: 'Sarah from the team has joined the conversation and may chime in to help.', source: 'agent-generated' },
+    ],
+    mockData: {
+      staffName: 'Sarah',
+      message: 'Sarah from the team has joined the conversation and may chime in to help.',
+    },
+  },
+  {
+    id: 'staff_left',
+    name: 'Staff Left',
+    description: 'Notifies the visitor that the staff member has left the conversation',
+    triggerHint: 'Shown when a staff member clicks "Leave" from the client dashboard live view',
+    sourceBadge: 'Staff',
+    fields: [
+      { name: 'staffName', mockValue: 'Sarah', source: 'brand-settings' },
+      { name: 'message', mockValue: 'Sarah has left the conversation. I\'m still here if you need anything!', source: 'agent-generated' },
+    ],
+    mockData: {
+      staffName: 'Sarah',
+      message: 'Sarah has left the conversation. I\'m still here if you need anything!',
     },
   },
 ];

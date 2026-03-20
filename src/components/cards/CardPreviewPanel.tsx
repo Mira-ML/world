@@ -7,6 +7,8 @@ import NavigateCard from './NavigateCard';
 import AgentReferralCard from './AgentReferralCard';
 import InquiryFormCard from './InquiryFormCard';
 import BookingCard from './BookingCard';
+import StaffIntroductionCard from './StaffIntroductionCard';
+import StaffLeftCard from './StaffLeftCard';
 
 interface Props {
   card: CardDefinition | null;
@@ -28,6 +30,10 @@ function renderCard(card: CardDefinition, brandColors: BrandColors) {
       return <InquiryFormCard fields={d.fields as any[]} brandColors={brandColors} />;
     case 'booking_form':
       return <BookingCard fields={d.fields as any[]} brandColors={brandColors} />;
+    case 'staff_introduction':
+      return <StaffIntroductionCard staffName={d.staffName as string} message={d.message as string} brandColors={brandColors} />;
+    case 'staff_left':
+      return <StaffLeftCard staffName={d.staffName as string} message={d.message as string} brandColors={brandColors} />;
     default:
       return null;
   }
