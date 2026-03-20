@@ -16,7 +16,7 @@ interface BillingInfo {
 interface TrendPoint { date: string; conversations: number; newPersons: number; }
 interface NoteConvo { conversationId: string; closedAt: string; outcome: string; summary: string; personDisplayName: string; }
 interface ClientDetail {
-  orgId: string; orgName: string; industry?: string; status?: string; agentId?: string;
+  orgId: string; orgName: string; status?: string; agentId?: string;
   conversationsMtd?: number; conversationsLastMonth?: number; totalPersons?: number;
   trend?: TrendPoint[]; segmentBreakdown?: Record<string, number>;
   billingStatus?: string; lastActive?: string; noteworthy?: NoteConvo[];
@@ -245,7 +245,7 @@ const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
               <div style={section}>
                 <div style={label}>Details</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                  {[['Industry', detail.industry || '—'], ['Status', detail.status || '—']].map(([k, v]) => (
+                  {[['Status', detail.status || '—']].map(([k, v]) => (
                     <div key={k}>
                       <div style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginBottom: 2 }}>{k}</div>
                       <div style={{ fontSize: 14, color: 'var(--color-text-primary)', fontWeight: 500 }}>{v}</div>

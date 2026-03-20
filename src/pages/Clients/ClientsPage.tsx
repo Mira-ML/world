@@ -13,7 +13,6 @@ interface TrendPoint {
 interface Client {
   orgId: string;
   brandName: string;
-  industry?: string;
   conversationsMtd: number;
   conversationsLastMonth: number;
   totalPersons: number;
@@ -117,8 +116,7 @@ const ClientsPage: React.FC = () => {
     .filter(c => showTombstoned || !c.tombstoned)
     .filter(c =>
       c.brandName?.toLowerCase().includes(search.toLowerCase()) ||
-      c.orgId?.toLowerCase().includes(search.toLowerCase()) ||
-      c.industry?.toLowerCase().includes(search.toLowerCase())
+      c.orgId?.toLowerCase().includes(search.toLowerCase())
     );
 
   return (
@@ -251,9 +249,6 @@ const ClientsPage: React.FC = () => {
                         }}>Tombstoned</span>
                       )}
                     </div>
-                    {client.industry && (
-                      <div style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginTop: 2 }}>{client.industry}</div>
-                    )}
                   </td>
                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                     <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>
