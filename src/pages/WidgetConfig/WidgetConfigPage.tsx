@@ -1,9 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useWorldData } from '../../contexts/WorldDataContext';
 
-/* ── Types ────────────────────────────────────────────── */
-
-interface Client { orgId: string; orgName: string; industry?: string; }
+/* -- Types ------------------------------------------------- */
 
 interface WidgetConfig {
   orbColor?: string;
@@ -33,7 +31,29 @@ interface WidgetConfig {
   [key: string]: unknown;
 }
 
-/* ── Color field definitions ─────────────────────────── */
+/* -- Default config (matches current hardcoded values) ----- */
+
+const DEFAULT_CONFIG: WidgetConfig = {
+  orbColor: '#A85951',
+  brandColor: '#A85951',
+  position: 'bottom-right',
+  previewPlaceholderText: 'Ask Mira anything...',
+  previewBarBackgroundColor: '#2C2218',
+  previewBarBorderColor: 'rgba(168,89,81,0.3)',
+  previewPlaceholderTextColor: 'rgba(255,255,255,0.5)',
+  expandedBackgroundColor: '#FAF3ED',
+  expandedMessageBubbleColor: '#FFFFFF',
+  expandedMessageTextColor: '#2C2218',
+  expandedAgentBubbleColor: '#F0E6DC',
+  expandedAgentTextColor: '#2C2218',
+  expandedInputBarBackgroundColor: '#FFFFFF',
+  expandedInputBarBorderColor: 'rgba(44,40,37,0.12)',
+  expandedInputBarTextColor: '#2C2218',
+  inputBarGlowColor: '#A85951',
+  agentDisplayName: 'Mira',
+};
+
+/* -- Color field definitions -------------------------------- */
 
 interface ColorField {
   key: string;
@@ -62,7 +82,7 @@ const COLOR_FIELDS: ColorField[] = [
   { key: 'inputBarGlowColor', label: 'Input glow', section: 'expanded' },
 ];
 
-/* ── Styles ───────────────────────────────────────────── */
+/* -- Styles ------------------------------------------------- */
 
 const card: React.CSSProperties = {
   background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
@@ -71,11 +91,6 @@ const card: React.CSSProperties = {
 const sectionLabel: React.CSSProperties = {
   fontSize: 11, color: 'var(--color-text-subtle)', fontWeight: 600, textTransform: 'uppercase',
   letterSpacing: '0.06em', padding: '14px 20px', borderBottom: '1px solid var(--color-border)',
-};
-const selectStyle: React.CSSProperties = {
-  background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
-  borderRadius: 8, padding: '8px 12px', fontSize: 14, color: 'var(--color-text-primary)',
-  outline: 'none', fontFamily: 'var(--font-input)', minWidth: 280,
 };
 const inputStyle: React.CSSProperties = {
   background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
@@ -87,74 +102,56 @@ const btnPrimary: React.CSSProperties = {
   borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 600,
   cursor: 'pointer', transition: 'opacity 0.15s',
 };
+const btnSecondary: React.CSSProperties = {
+  background: 'transparent', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)',
+  borderRadius: 8, padding: '8px 20px', fontSize: 13, fontWeight: 500,
+  cursor: 'pointer', transition: 'opacity 0.15s',
+};
 
-/* ── Component ────────────────────────────────────────── */
+/* -- Component ---------------------------------------------- */
 
 const WidgetConfigPage: React.FC = () => {
-  const { apiFetch, baseApiFetch } = useWorldData();
+  const { apiFetch } = useWorldData();
 
-  const [clients, setClients] = useState<Client[]>([]);
-  const [loadingClients, setLoadingClients] = useState(true);
-  const [selectedOrgId, setSelectedOrgId] = useState('');
-
-  const [config, setConfig] = useState<WidgetConfig>({});
-  const [savedConfig, setSavedConfig] = useState<WidgetConfig>({});
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [config, setConfig] = useState<WidgetConfig>({ ...DEFAULT_CONFIG });
+  const [savedConfig, setSavedConfig] = useState<WidgetConfig>({ ...DEFAULT_CONFIG });
+  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
-  // Load org list
-  useEffect(() => {
-    apiFetch('/clients')
-      .then(d => setClients(d.clients ?? []))
-      .catch(() => { /* best-effort */ })
-      .finally(() => setLoadingClients(false));
-  }, [apiFetch]);
-
-  // Fetch widget config when org changes
-  const loadConfig = useCallback(async (orgId: string) => {
-    if (!orgId) { setConfig({}); setSavedConfig({}); return; }
+  // Load config from world API
+  const loadConfig = useCallback(async () => {
     setLoading(true);
-    setError(null);
     setFeedback(null);
     try {
-      const data = await baseApiFetch(`/widget?orgId=${encodeURIComponent(orgId)}`);
-      setConfig(data);
-      setSavedConfig(data);
+      const data = await apiFetch('/widget-config');
+      const stored = data.config || {};
+      // Merge defaults with stored values
+      const merged = { ...DEFAULT_CONFIG, ...stored };
+      setConfig(merged);
+      setSavedConfig(merged);
     } catch (e: any) {
-      setError(e.message);
-      setConfig({});
-      setSavedConfig({});
+      // On first use, no config exists yet — use defaults
+      setConfig({ ...DEFAULT_CONFIG });
+      setSavedConfig({ ...DEFAULT_CONFIG });
     } finally {
       setLoading(false);
     }
-  }, [baseApiFetch]);
+  }, [apiFetch]);
 
-  useEffect(() => { void loadConfig(selectedOrgId); }, [selectedOrgId, loadConfig]);
+  useEffect(() => { void loadConfig(); }, [loadConfig]);
 
   // Save changes
   const handleSave = async () => {
-    if (!selectedOrgId) return;
     setSaving(true);
     setFeedback(null);
     try {
-      // Only send changed fields
-      const changes: Record<string, unknown> = {};
-      for (const [key, val] of Object.entries(config)) {
-        if (val !== savedConfig[key]) changes[key] = val;
-      }
-      if (Object.keys(changes).length === 0) {
-        setFeedback({ type: 'success', msg: 'No changes to save.' });
-        setSaving(false);
-        return;
-      }
-      await baseApiFetch(`/widget?orgId=${encodeURIComponent(selectedOrgId)}`, {
-        method: 'PATCH',
-        body: JSON.stringify(changes),
+      await apiFetch('/widget-config', {
+        method: 'PUT',
+        body: JSON.stringify({ config }),
       });
       setSavedConfig({ ...config });
-      setFeedback({ type: 'success', msg: 'Widget config saved.' });
+      setFeedback({ type: 'success', msg: 'Widget config saved. Changes will apply on next dashboard reload.' });
     } catch (e: any) {
       setFeedback({ type: 'error', msg: e.message });
     } finally {
@@ -162,12 +159,16 @@ const WidgetConfigPage: React.FC = () => {
     }
   };
 
+  const handleReset = () => {
+    setConfig({ ...DEFAULT_CONFIG });
+    setFeedback(null);
+  };
+
   const updateField = (key: string, value: string) => {
     setConfig(prev => ({ ...prev, [key]: value }));
   };
 
   const isDirty = JSON.stringify(config) !== JSON.stringify(savedConfig);
-  const selectedClient = clients.find(c => c.orgId === selectedOrgId);
   const collapsedFields = COLOR_FIELDS.filter(f => f.section === 'collapsed');
   const expandedFields = COLOR_FIELDS.filter(f => f.section === 'expanded');
 
@@ -178,34 +179,8 @@ const WidgetConfigPage: React.FC = () => {
           Widget Configuration
         </h1>
         <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--color-text-muted)' }}>
-          Configure widget appearance for any organization. Changes apply to both the customer widget and dashboard assistant.
+          Configure the appearance of the internal Mira dashboard assistant widget.
         </p>
-      </div>
-
-      {/* Org selector */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <label style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-muted)' }}>Organization</label>
-        {loadingClients ? (
-          <span style={{ fontSize: 13, color: 'var(--color-text-subtle)' }}>Loading…</span>
-        ) : (
-          <select
-            value={selectedOrgId}
-            onChange={e => setSelectedOrgId(e.target.value)}
-            style={selectStyle}
-          >
-            <option value="">Select an organization…</option>
-            {clients.map(c => (
-              <option key={c.orgId} value={c.orgId}>
-                {c.orgName || c.orgId}{c.industry ? ` (${c.industry})` : ''}
-              </option>
-            ))}
-          </select>
-        )}
-        {selectedClient && (
-          <span style={{ fontSize: 11, color: 'var(--color-text-subtle)', fontFamily: 'var(--font-mono)' }}>
-            {selectedClient.orgId}
-          </span>
-        )}
       </div>
 
       {/* Feedback banner */}
@@ -220,16 +195,8 @@ const WidgetConfigPage: React.FC = () => {
         </div>
       )}
 
-      {!selectedOrgId ? (
-        <div style={{ ...card, padding: '40px 20px', textAlign: 'center' }}>
-          <p style={{ margin: 0, fontSize: 14, color: 'var(--color-text-subtle)' }}>
-            Select an organization to configure its widget appearance.
-          </p>
-        </div>
-      ) : loading ? (
-        <div style={{ color: 'var(--color-text-muted)', fontSize: 14 }}>Loading widget config…</div>
-      ) : error ? (
-        <div style={{ color: 'var(--color-negative)', fontSize: 14 }}>{error}</div>
+      {loading ? (
+        <div style={{ color: 'var(--color-text-muted)', fontSize: 14 }}>Loading widget config...</div>
       ) : (
         <>
           {/* General settings */}
@@ -263,7 +230,11 @@ const WidgetConfigPage: React.FC = () => {
                   Position
                 </label>
                 <select
-                  style={{ ...selectStyle, minWidth: 180 }}
+                  style={{
+                    background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
+                    borderRadius: 8, padding: '8px 12px', fontSize: 14, color: 'var(--color-text-primary)',
+                    outline: 'none', fontFamily: 'var(--font-input)', minWidth: 180,
+                  }}
                   value={(config.position as string) ?? 'bottom-right'}
                   onChange={e => updateField('position', e.target.value)}
                 >
@@ -305,14 +276,21 @@ const WidgetConfigPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Save button */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          {/* Action buttons */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <button
+              style={{ ...btnSecondary, opacity: isDirty ? 1 : 0.5 }}
+              onClick={handleReset}
+              disabled={!isDirty}
+            >
+              Reset to Defaults
+            </button>
             <button
               style={{ ...btnPrimary, opacity: isDirty && !saving ? 1 : 0.5 }}
               onClick={handleSave}
               disabled={!isDirty || saving}
             >
-              {saving ? 'Saving…' : 'Save Changes'}
+              {saving ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         </>
@@ -321,7 +299,7 @@ const WidgetConfigPage: React.FC = () => {
   );
 };
 
-/* ── ColorPicker ──────────────────────────────────────── */
+/* -- ColorPicker -------------------------------------------- */
 
 const ColorPicker: React.FC<{
   label: string;
