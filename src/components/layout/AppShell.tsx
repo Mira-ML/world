@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { to: '/flags', label: 'FEATURE FLAGS', end: false },
   { to: '/widget-flags', label: 'WIDGET FLAGS', end: false },
   { to: '/cards', label: 'CARDS', end: false },
+  { to: '/widget-config', label: 'WIDGET CONFIG', end: false },
 ];
 
 const sectionSubTabs: Record<string, SubTab[]> = {

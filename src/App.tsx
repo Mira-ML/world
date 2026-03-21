@@ -15,6 +15,7 @@ import NetworkPage from './pages/Network/NetworkPage';
 import FeatureFlagsPage from './pages/FeatureFlags/FeatureFlagsPage';
 import WidgetFlagsPage from './pages/WidgetFlags/WidgetFlagsPage';
 import CardsPage from './pages/Cards/CardsPage';
+import WidgetConfigPage from './pages/WidgetConfig/WidgetConfigPage';
 
 const App: React.FC = () => (
   <Auth0Provider {...auth0Config}>
@@ -36,6 +37,7 @@ const App: React.FC = () => (
               <Route path="flags" element={<FeatureFlagsPage />} />
               <Route path="widget-flags" element={<WidgetFlagsPage />} />
               <Route path="cards" element={<CardsPage />} />
+              <Route path="widget-config" element={<WidgetConfigPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
