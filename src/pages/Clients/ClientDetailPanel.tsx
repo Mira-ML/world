@@ -89,6 +89,11 @@ const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
   const [promptAgentName, setPromptAgentName] = useState('');
   const [promptLoading, setPromptLoading] = useState(false);
 
+  // Org settings (for toggles like dashboardAssistantEnabled)
+  const [orgSettings, setOrgSettings] = useState<{ dashboardAssistantEnabled?: boolean }>({});
+  const [orgSettingsLoading, setOrgSettingsLoading] = useState(false);
+  const [orgSettingsSaving, setOrgSettingsSaving] = useState<string | null>(null);
+
   // Decorum rules
   const [decorumRules, setDecorumRules] = useState<DecorumRules>({ ...DECORUM_DEFAULTS });
   const [decorumIsDefault, setDecorumIsDefault] = useState(true);
@@ -115,6 +120,12 @@ const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
       .then(d => setIntegrations(d.integrations ?? []))
       .catch(() => {})
       .finally(() => setIntegrationsLoading(false));
+    // Load org settings
+    setOrgSettingsLoading(true);
+    baseApiFetch(`/orgs/settings`, { headers: { 'X-Internal-Org-Id': orgId } })
+      .then(d => setOrgSettings({ dashboardAssistantEnabled: d.dashboardAssistantEnabled ?? false }))
+      .catch(() => {})
+      .finally(() => setOrgSettingsLoading(false));
     // Load decorum rules
     setDecorumLoading(true);
     baseApiFetch(`/decorum/rules`, { headers: { 'X-Internal-Org-Id': orgId } })
@@ -188,6 +199,19 @@ const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
       setDecorumIsDefault(false);
       setDecorumDirty(false);
     } catch (e) {} finally { setDecorumSaving(false); }
+  };
+
+  const handleOrgSettingToggle = async (key: string) => {
+    const newValue = !((orgSettings as any)[key] ?? false);
+    setOrgSettingsSaving(key);
+    try {
+      await baseApiFetch(`/orgs/settings`, {
+        method: 'PATCH',
+        headers: { 'X-Internal-Org-Id': orgId },
+        body: JSON.stringify({ [key]: newValue }),
+      });
+      setOrgSettings(prev => ({ ...prev, [key]: newValue }));
+    } catch (e) {} finally { setOrgSettingsSaving(null); }
   };
 
   // Close on Escape key
@@ -674,6 +698,38 @@ const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
                   )}
                 </div>
               )}
+
+              {/* ── Org Settings Toggles ─────────────── */}
+              <div style={section}>
+                <div style={label}>Org Settings</div>
+                {orgSettingsLoading ? (
+                  <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Loading…</div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>Dashboard Assistant (Beta)</div>
+                      <div style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginTop: 2 }}>Enable AI assistant in the client dashboard</div>
+                    </div>
+                    <button
+                      onClick={() => handleOrgSettingToggle('dashboardAssistantEnabled')}
+                      disabled={orgSettingsSaving === 'dashboardAssistantEnabled'}
+                      style={{
+                        position: 'relative', width: 40, height: 22, borderRadius: 11,
+                        border: 'none', cursor: orgSettingsSaving ? 'default' : 'pointer',
+                        background: orgSettings.dashboardAssistantEnabled ? 'var(--color-accent)' : 'var(--color-border)',
+                        transition: 'background 0.2s', flexShrink: 0,
+                        opacity: orgSettingsSaving === 'dashboardAssistantEnabled' ? 0.5 : 1,
+                      }}
+                    >
+                      <span style={{
+                        position: 'absolute', top: 2, left: orgSettings.dashboardAssistantEnabled ? 20 : 2,
+                        width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                        transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                      }} />
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {/* Flags */}
               {detail.flags.length > 0 && (
