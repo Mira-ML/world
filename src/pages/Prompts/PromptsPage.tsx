@@ -12,7 +12,7 @@ interface Prompt {
   updatedBy: string;
 }
 
-type TabId = 'client-dashboard' | 'agents';
+type TabId = 'client-dashboard' | 'agents' | 'dashboard-assistant';
 
 const card: React.CSSProperties = {
   background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-tile)',
@@ -52,9 +52,12 @@ const PromptsPage: React.FC = () => {
     }
   };
 
+  const DASHBOARD_ASSISTANT_IDS = ['DASHBOARD_ASSISTANT_001', 'PRODUCT_KNOWLEDGE_001'];
   const tabPrompts = activeTab === 'agents'
     ? prompts.filter(p => p.promptId.startsWith('AGENT_'))
-    : prompts.filter(p => !p.promptId.startsWith('AGENT_'));
+    : activeTab === 'dashboard-assistant'
+    ? prompts.filter(p => DASHBOARD_ASSISTANT_IDS.includes(p.promptId))
+    : prompts.filter(p => !p.promptId.startsWith('AGENT_') && !DASHBOARD_ASSISTANT_IDS.includes(p.promptId));
 
   const tabStyle = (id: TabId): React.CSSProperties => ({
     padding: '8px 18px',
@@ -87,7 +90,22 @@ const PromptsPage: React.FC = () => {
         <button style={tabStyle('agents')} onClick={() => setActiveTab('agents')}>
           Agents
         </button>
+        <button style={tabStyle('dashboard-assistant')} onClick={() => setActiveTab('dashboard-assistant')}>
+          Dashboard Assistant
+        </button>
       </div>
+
+      {activeTab === 'dashboard-assistant' && (
+        <div style={{
+          padding: '10px 14px', background: 'var(--color-bg-surface)',
+          border: '1px solid var(--color-border)', borderRadius: 8,
+          fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.6,
+        }}>
+          Behavior and product knowledge for the Mira dashboard assistant embedded in studio.mira.ml.
+          DASHBOARD_ASSISTANT_001 defines tone, tools, and guardrails. PRODUCT_KNOWLEDGE_001 is the
+          merchant-facing knowledge base the assistant references when answering questions.
+        </div>
+      )}
 
       {activeTab === 'agents' && (
         <div style={{
