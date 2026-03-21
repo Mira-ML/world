@@ -36,7 +36,7 @@ interface WidgetConfig {
 /* ── Color field definitions ─────────────────────────── */
 
 interface ColorField {
-  key: keyof WidgetConfig;
+  key: string;
   label: string;
   section: 'collapsed' | 'expanded';
 }
