@@ -9,6 +9,8 @@ import InquiryFormCard from './InquiryFormCard';
 import BookingCard from './BookingCard';
 import StaffIntroductionCard from './StaffIntroductionCard';
 import StaffLeftCard from './StaffLeftCard';
+import EmailHandoffCard from './EmailHandoffCard';
+import WhatsAppHandoffCard from './WhatsAppHandoffCard';
 
 interface Props {
   card: CardDefinition | null;
@@ -34,6 +36,10 @@ function renderCard(card: CardDefinition, brandColors: BrandColors) {
       return <StaffIntroductionCard staffName={d.staffName as string} message={d.message as string} brandColors={brandColors} />;
     case 'staff_left':
       return <StaffLeftCard staffName={d.staffName as string} message={d.message as string} brandColors={brandColors} />;
+    case 'email_handoff':
+      return <EmailHandoffCard recipientEmail={d.recipientEmail as string} message={d.message as string} brandColors={brandColors} />;
+    case 'whatsapp_handoff':
+      return <WhatsAppHandoffCard whatsappNumber={d.whatsappNumber as string} message={d.message as string} brandColors={brandColors} />;
     default:
       return null;
   }

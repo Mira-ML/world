@@ -124,15 +124,19 @@ const CardsPage: React.FC = () => {
           {CARD_DEFINITIONS.map(c => {
             const isExpanded = expandedId === c.id;
             const sc = CARD_SOURCE_COLORS[c.sourceBadge];
+            const isComingSoon = c.comingSoon === true;
             return (
-              <div key={c.id} style={isExpanded ? cardExpanded : card} onClick={() => toggle(c.id)}>
+              <div key={c.id} style={{ ...(isExpanded ? cardExpanded : card), ...(isComingSoon ? { opacity: 0.5, cursor: 'default' } : {}) }} onClick={() => !isComingSoon && toggle(c.id)}>
                 <div style={rowMain}>
                   <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)', whiteSpace: 'nowrap' }}>{c.name}</span>
                   <span style={{ fontSize: 13, color: 'var(--color-text-muted)', flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.description}</span>
                   <span style={{ ...badge, background: sc.bg, color: sc.fg }}>{c.sourceBadge}</span>
-                  {isExpanded
+                  {isComingSoon && (
+                    <span style={{ ...badge, background: 'rgba(0,0,0,0.06)', color: 'var(--color-text-subtle)', fontSize: 9 }}>Coming Soon</span>
+                  )}
+                  {!isComingSoon && (isExpanded
                     ? <ChevronUp size={16} color="var(--color-text-subtle)" />
-                    : <ChevronDown size={16} color="var(--color-text-subtle)" />}
+                    : <ChevronDown size={16} color="var(--color-text-subtle)" />)}
                 </div>
                 {isExpanded && (
                   <div style={{ padding: '0 16px 16px', borderTop: '1px solid var(--color-border)' }}>
