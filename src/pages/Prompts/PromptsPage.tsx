@@ -7,7 +7,6 @@ interface Prompt {
   displayName: string;
   description: string;
   promptBody: string;
-  version: number;
   updatedAt: string;
   updatedBy: string;
 }
@@ -139,10 +138,7 @@ const PromptsPage: React.FC = () => {
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 3 }}>{prompt.description}</div>
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>v{prompt.version}</span>
-                {isExpanded ? <ChevronUp size={14} style={{ color: 'var(--color-text-subtle)' }} /> : <ChevronDown size={14} style={{ color: 'var(--color-text-subtle)' }} />}
-              </div>
+              {isExpanded ? <ChevronUp size={14} style={{ color: 'var(--color-text-subtle)' }} /> : <ChevronDown size={14} style={{ color: 'var(--color-text-subtle)' }} />}
             </div>
 
             {isExpanded && (
