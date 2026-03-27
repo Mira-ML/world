@@ -106,6 +106,17 @@ const PromptsPage: React.FC = () => {
         </div>
       )}
 
+      {activeTab === 'client-dashboard' && (
+        <div style={{
+          padding: '10px 14px', background: 'var(--color-bg-surface)',
+          border: '1px solid var(--color-border)', borderRadius: 8,
+          fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.6,
+        }}>
+          AI autofill prompts used in the merchant dashboard, plus email notification prompts
+          (New Inquiry and Weekly Digest) sent to merchants. Edits take effect within 5 minutes via cache TTL.
+        </div>
+      )}
+
       {activeTab === 'agents' && (
         <div style={{
           padding: '10px 14px', background: 'var(--color-bg-surface)',
