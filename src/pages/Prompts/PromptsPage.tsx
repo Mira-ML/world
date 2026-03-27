@@ -11,7 +11,7 @@ interface Prompt {
   updatedBy: string;
 }
 
-type TabId = 'client-dashboard' | 'agents' | 'dashboard-assistant';
+type TabId = 'client-dashboard' | 'agents' | 'dashboard-assistant' | 'playbook';
 
 const card: React.CSSProperties = {
   background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-tile)',
@@ -56,7 +56,9 @@ const PromptsPage: React.FC = () => {
     ? prompts.filter(p => p.promptId.startsWith('AGENT_'))
     : activeTab === 'dashboard-assistant'
     ? prompts.filter(p => DASHBOARD_ASSISTANT_IDS.includes(p.promptId))
-    : prompts.filter(p => !p.promptId.startsWith('AGENT_') && !DASHBOARD_ASSISTANT_IDS.includes(p.promptId));
+    : activeTab === 'playbook'
+    ? prompts.filter(p => p.promptId.startsWith('PLAYBOOK_'))
+    : prompts.filter(p => !p.promptId.startsWith('AGENT_') && !DASHBOARD_ASSISTANT_IDS.includes(p.promptId) && !p.promptId.startsWith('PLAYBOOK_'));
 
   const tabStyle = (id: TabId): React.CSSProperties => ({
     padding: '8px 18px',
@@ -92,6 +94,9 @@ const PromptsPage: React.FC = () => {
         <button style={tabStyle('dashboard-assistant')} onClick={() => setActiveTab('dashboard-assistant')}>
           Dashboard Assistant
         </button>
+        <button style={tabStyle('playbook')} onClick={() => setActiveTab('playbook')}>
+          Playbook
+        </button>
       </div>
 
       {activeTab === 'dashboard-assistant' && (
@@ -103,6 +108,18 @@ const PromptsPage: React.FC = () => {
           Behavior and product knowledge for the Mira dashboard assistant embedded in studio.mira.ml.
           DASHBOARD_ASSISTANT_001 defines tone, tools, and guardrails. PRODUCT_KNOWLEDGE_001 is the
           merchant-facing knowledge base the assistant references when answering questions.
+        </div>
+      )}
+
+      {activeTab === 'playbook' && (
+        <div style={{
+          padding: '10px 14px', background: 'var(--color-bg-surface)',
+          border: '1px solid var(--color-border)', borderRadius: 8,
+          fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.6,
+        }}>
+          Prefilled messages and CTA prompts used on the mira.ml landing page. When a visitor clicks
+          a CTA button, the corresponding message is sent to the chat widget on their behalf.
+          Edits here update the live site — no code deploy needed.
         </div>
       )}
 
