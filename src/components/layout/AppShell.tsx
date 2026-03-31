@@ -16,6 +16,7 @@ const NAV_ITEMS = [
   { to: '/costs', label: 'COSTS', end: false },
   { to: '/playbook', label: 'PLAYBOOK', end: false },
   { to: '/network', label: 'NETWORK', end: false },
+  { to: '/communications', label: 'COMMUNICATIONS', end: false },
   { to: '/flags', label: 'FEATURE FLAGS', end: false },
   { to: '/widget-flags', label: 'WIDGET FLAGS', end: false },
   { to: '/cards', label: 'CARDS', end: false },
@@ -27,6 +28,11 @@ const sectionSubTabs: Record<string, SubTab[]> = {
     { id: 'prompts', label: 'Prompts', path: '/playbook' },
     { id: 'segments', label: 'Segments', path: '/playbook/segments' },
     { id: 'funnel', label: 'Funnel', path: '/playbook/funnel' },
+  ],
+  communications: [
+    { id: 'notifications', label: 'Notifications', path: '/communications' },
+    { id: 'feedback', label: 'Feedback', path: '/communications/feedback' },
+    { id: 'conversations', label: 'Conversations', path: '/communications/conversations' },
   ],
 };
 
@@ -106,14 +112,16 @@ const AppShell: React.FC = () => {
             {subTabs.length > 0 && (
               <nav className="app-shell__sub-tabs">
                 {subTabs.map(tab => {
-                  const isActive = tab.path === '/playbook'
-                    ? location.pathname === '/playbook' || location.pathname === '/playbook/'
+                  const sectionRoot = `/${sectionKey}`;
+                  const isRoot = tab.path === sectionRoot;
+                  const isActive = isRoot
+                    ? location.pathname === sectionRoot || location.pathname === `${sectionRoot}/`
                     : location.pathname.startsWith(tab.path);
                   return (
                     <NavLink
                       key={tab.id}
                       to={tab.path}
-                      end={tab.path === '/playbook'}
+                      end={isRoot}
                       className={`app-shell__sub-tab${isActive ? ' app-shell__sub-tab--active' : ''}`}
                     >
                       {tab.label}

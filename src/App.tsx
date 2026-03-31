@@ -16,6 +16,9 @@ import FeatureFlagsPage from './pages/FeatureFlags/FeatureFlagsPage';
 import WidgetFlagsPage from './pages/WidgetFlags/WidgetFlagsPage';
 import CardsPage from './pages/Cards/CardsPage';
 import WidgetConfigPage from './pages/WidgetConfig/WidgetConfigPage';
+import NotificationsPage from './pages/Communications/NotificationsPage';
+import FeedbackPage from './pages/Communications/FeedbackPage';
+import CommunicationsConversationsPage from './pages/Communications/ConversationsPage';
 
 const App: React.FC = () => (
   <Auth0Provider {...auth0Config}>
@@ -33,6 +36,10 @@ const App: React.FC = () => (
               <Route path="playbook/funnel" element={<FunnelConfigPage />} />
               {/* Legacy redirect */}
               <Route path="prompts" element={<Navigate to="/playbook" replace />} />
+              {/* Communications section — sub-tabs: Notifications | Feedback | Conversations */}
+              <Route path="communications" element={<NotificationsPage />} />
+              <Route path="communications/feedback" element={<FeedbackPage />} />
+              <Route path="communications/conversations" element={<CommunicationsConversationsPage />} />
               <Route path="network" element={<NetworkPage />} />
               <Route path="flags" element={<FeatureFlagsPage />} />
               <Route path="widget-flags" element={<WidgetFlagsPage />} />
