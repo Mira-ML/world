@@ -7,8 +7,6 @@ import NavigateCard from './NavigateCard';
 import AgentReferralCard from './AgentReferralCard';
 import InquiryFormCard from './InquiryFormCard';
 import BookingCard from './BookingCard';
-import StaffIntroductionCard from './StaffIntroductionCard';
-import StaffLeftCard from './StaffLeftCard';
 import EmailHandoffCard from './EmailHandoffCard';
 import WhatsAppHandoffCard from './WhatsAppHandoffCard';
 
@@ -32,10 +30,6 @@ function renderCard(card: CardDefinition, brandColors: BrandColors) {
       return <InquiryFormCard fields={d.fields as any[]} brandColors={brandColors} />;
     case 'booking_form':
       return <BookingCard fields={d.fields as any[]} brandColors={brandColors} />;
-    case 'staff_introduction':
-      return <StaffIntroductionCard staffName={d.staffName as string} message={d.message as string} brandColors={brandColors} />;
-    case 'staff_left':
-      return <StaffLeftCard staffName={d.staffName as string} message={d.message as string} brandColors={brandColors} />;
     case 'email_handoff':
       return <EmailHandoffCard recipientEmail={d.recipientEmail as string} message={d.message as string} brandColors={brandColors} />;
     case 'whatsapp_handoff':

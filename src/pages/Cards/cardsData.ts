@@ -162,36 +162,6 @@ export const CARD_DEFINITIONS: CardDefinition[] = [
     },
   },
   {
-    id: 'staff_introduction',
-    name: 'Staff Joined',
-    description: 'Notifies the visitor that a staff member has joined the conversation',
-    triggerHint: 'Shown when a staff member clicks "Join" from the client dashboard live view',
-    sourceBadge: 'Staff',
-    fields: [
-      { name: 'staffName', mockValue: 'Sarah', source: 'brand-settings' },
-      { name: 'message', mockValue: 'Sarah from the team has joined the conversation and may chime in to help.', source: 'agent-generated' },
-    ],
-    mockData: {
-      staffName: 'Sarah',
-      message: 'Sarah from the team has joined the conversation and may chime in to help.',
-    },
-  },
-  {
-    id: 'staff_left',
-    name: 'Staff Left',
-    description: 'Notifies the visitor that the staff member has left the conversation',
-    triggerHint: 'Shown when a staff member clicks "Leave" from the client dashboard live view',
-    sourceBadge: 'Staff',
-    fields: [
-      { name: 'staffName', mockValue: 'Sarah', source: 'brand-settings' },
-      { name: 'message', mockValue: 'Sarah has left the conversation. I\'m still here if you need anything!', source: 'agent-generated' },
-    ],
-    mockData: {
-      staffName: 'Sarah',
-      message: 'Sarah has left the conversation. I\'m still here if you need anything!',
-    },
-  },
-  {
     id: 'email_handoff',
     name: 'Email Handoff',
     description: 'Notifies the visitor that the conversation has been forwarded to the team via email',

@@ -37,32 +37,6 @@ interface PromptSection {
   content: string;
 }
 
-// Phase 2 will add partner agent rules here with ruleScope="partner_agent#{agentId}"
-interface DecorumRules {
-  staffPresentBehavior: string | null;
-  staffOfferTrigger: string | null;
-  staffDepartureMessage: string | null;
-  heartbeatTimeoutSeconds: number | null;
-}
-
-const DECORUM_DEFAULTS: DecorumRules = {
-  staffPresentBehavior: 'muted_listening',
-  staffOfferTrigger: 'contextual',
-  staffDepartureMessage: '',
-  heartbeatTimeoutSeconds: 90,
-};
-
-const BEHAVIOR_OPTIONS = [
-  { value: 'muted_listening', label: 'Muted listening' },
-  { value: 'silent', label: 'Silent' },
-  { value: 'active', label: 'Active' },
-];
-
-const TRIGGER_OPTIONS = [
-  { value: 'explicit_request_only', label: 'Explicit request only' },
-  { value: 'contextual', label: 'Contextual (agent judgment)' },
-];
-
 interface Props { orgId: string; onClose: () => void; }
 
 const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
@@ -96,19 +70,6 @@ const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
   const [orgSettingsLoading, setOrgSettingsLoading] = useState(false);
   const [orgSettingsSaving, setOrgSettingsSaving] = useState<string | null>(null);
 
-  // Global decorum defaults
-  const [globalDecorum, setGlobalDecorum] = useState<DecorumRules>({ ...DECORUM_DEFAULTS });
-  const [globalDecorumLoading, setGlobalDecorumLoading] = useState(false);
-  const [globalDecorumSaving, setGlobalDecorumSaving] = useState(false);
-  const [globalDecorumDirty, setGlobalDecorumDirty] = useState(false);
-
-  // Per-org decorum overrides (null = inherit from global)
-  const [decorumRules, setDecorumRules] = useState<DecorumRules>({ staffPresentBehavior: null, staffOfferTrigger: null, staffDepartureMessage: null, heartbeatTimeoutSeconds: null });
-  const [decorumHasOverride, setDecorumHasOverride] = useState(false);
-  const [decorumLoading, setDecorumLoading] = useState(false);
-  const [decorumSaving, setDecorumSaving] = useState(false);
-  const [decorumDirty, setDecorumDirty] = useState(false);
-
   const load = () => {
     setLoading(true);
     apiFetch(`/clients/${orgId}`).then(setDetail).catch(() => {}).finally(() => setLoading(false));
@@ -134,40 +95,6 @@ const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
       .then(d => setOrgSettings({ dashboardAssistantEnabled: d.dashboardAssistantEnabled ?? false }))
       .catch(() => {})
       .finally(() => setOrgSettingsLoading(false));
-    // Load global decorum defaults
-    setGlobalDecorumLoading(true);
-    baseApiFetch(`/decorum/rules/global`)
-      .then(d => {
-        setGlobalDecorum({
-          staffPresentBehavior: d.staffPresentBehavior ?? DECORUM_DEFAULTS.staffPresentBehavior,
-          staffOfferTrigger: d.staffOfferTrigger ?? DECORUM_DEFAULTS.staffOfferTrigger,
-          staffDepartureMessage: d.staffDepartureMessage ?? DECORUM_DEFAULTS.staffDepartureMessage,
-          heartbeatTimeoutSeconds: d.heartbeatTimeoutSeconds ?? DECORUM_DEFAULTS.heartbeatTimeoutSeconds,
-        });
-        setGlobalDecorumDirty(false);
-      })
-      .catch(() => setGlobalDecorum({ ...DECORUM_DEFAULTS }))
-      .finally(() => setGlobalDecorumLoading(false));
-    // Load per-org decorum overrides (raw org record, not merged)
-    setDecorumLoading(true);
-    baseApiFetch(`/decorum/rules`, { headers: { 'X-Internal-Org-Id': orgId } })
-      .then(d => {
-        // The GET endpoint returns merged values; we store them as overrides
-        // but we mark hasOverride so the UI knows this org has a record
-        setDecorumRules({
-          staffPresentBehavior: d.staffPresentBehavior ?? null,
-          staffOfferTrigger: d.staffOfferTrigger ?? null,
-          staffDepartureMessage: d.staffDepartureMessage ?? null,
-          heartbeatTimeoutSeconds: d.heartbeatTimeoutSeconds ?? null,
-        });
-        setDecorumHasOverride(true);
-        setDecorumDirty(false);
-      })
-      .catch(() => {
-        setDecorumRules({ staffPresentBehavior: null, staffOfferTrigger: null, staffDepartureMessage: null, heartbeatTimeoutSeconds: null });
-        setDecorumHasOverride(false);
-      })
-      .finally(() => setDecorumLoading(false));
   }, [orgId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Load noteworthy prompt lazily when expanded
@@ -206,46 +133,6 @@ const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
       setNewNote('');
       load();
     } catch (e) {} finally { setSaving(false); }
-  };
-
-  const handleGlobalDecorumChange = (field: keyof DecorumRules, value: string | number | null) => {
-    setGlobalDecorum(prev => ({ ...prev, [field]: value }));
-    setGlobalDecorumDirty(true);
-  };
-
-  const handleGlobalDecorumSave = async () => {
-    setGlobalDecorumSaving(true);
-    try {
-      await baseApiFetch(`/decorum/rules/global`, {
-        method: 'PUT',
-        body: JSON.stringify({ ruleScope: 'staff', ...globalDecorum }),
-      });
-      setGlobalDecorumDirty(false);
-    } catch (e) {} finally { setGlobalDecorumSaving(false); }
-  };
-
-  const handleDecorumChange = (field: keyof DecorumRules, value: string | number | null) => {
-    setDecorumRules(prev => ({ ...prev, [field]: value === '' ? null : value }));
-    setDecorumDirty(true);
-  };
-
-  const handleDecorumSave = async () => {
-    setDecorumSaving(true);
-    try {
-      // Only send non-null fields so the server does a partial update
-      const payload: Record<string, unknown> = { ruleScope: 'staff' };
-      if (decorumRules.staffPresentBehavior != null) payload.staffPresentBehavior = decorumRules.staffPresentBehavior;
-      if (decorumRules.staffOfferTrigger != null) payload.staffOfferTrigger = decorumRules.staffOfferTrigger;
-      if (decorumRules.staffDepartureMessage != null) payload.staffDepartureMessage = decorumRules.staffDepartureMessage;
-      if (decorumRules.heartbeatTimeoutSeconds != null) payload.heartbeatTimeoutSeconds = decorumRules.heartbeatTimeoutSeconds;
-      await baseApiFetch(`/decorum/rules`, {
-        method: 'PUT',
-        headers: { 'X-Internal-Org-Id': orgId },
-        body: JSON.stringify(payload),
-      });
-      setDecorumHasOverride(true);
-      setDecorumDirty(false);
-    } catch (e) {} finally { setDecorumSaving(false); }
   };
 
   const handleOrgSettingToggle = async (key: string) => {
@@ -555,88 +442,6 @@ const ClientDetailModal: React.FC<Props> = ({ orgId, onClose }) => {
                   </div>
                 );
               })()}
-
-              {/* ── Decorum Rules ── */}
-              <div style={section}>
-                <div style={label}>Decorum Rules</div>
-
-                {/* ── Global Defaults ── */}
-                <div style={{ background: 'var(--color-bg-primary)', borderRadius: 10, padding: '16px 18px', marginBottom: 16, border: '1px solid var(--color-border)' }}>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--color-accent)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12 }}>Global Defaults</div>
-                  {globalDecorumLoading ? (
-                    <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Loading…</div>
-                  ) : (
-                    <>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        <div>
-                          <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>Staff present behavior</div>
-                          <select value={globalDecorum.staffPresentBehavior ?? ''} onChange={e => handleGlobalDecorumChange('staffPresentBehavior', e.target.value)} style={{ width: '100%', padding: '6px 10px', fontSize: 13, background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-primary)', fontFamily: 'var(--font-input)', outline: 'none', cursor: 'pointer' }}>
-                            {BEHAVIOR_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>Staff offer trigger</div>
-                          <select value={globalDecorum.staffOfferTrigger ?? ''} onChange={e => handleGlobalDecorumChange('staffOfferTrigger', e.target.value)} style={{ width: '100%', padding: '6px 10px', fontSize: 13, background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-primary)', fontFamily: 'var(--font-input)', outline: 'none', cursor: 'pointer' }}>
-                            {TRIGGER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>Staff departure message</div>
-                          <input type="text" value={globalDecorum.staffDepartureMessage ?? ''} onChange={e => handleGlobalDecorumChange('staffDepartureMessage', e.target.value)} placeholder="e.g. 'I'm back if you need anything else!'" style={{ width: '100%', padding: '6px 10px', fontSize: 13, background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-primary)', fontFamily: 'var(--font-input)', outline: 'none', boxSizing: 'border-box' }} />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>Auto-resume timeout (seconds)</div>
-                          <div style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginBottom: 4, fontStyle: 'italic' }}>How long after staff heartbeat expires before the agent auto-resumes</div>
-                          <input type="number" value={globalDecorum.heartbeatTimeoutSeconds ?? 90} onChange={e => handleGlobalDecorumChange('heartbeatTimeoutSeconds', e.target.value ? parseInt(e.target.value, 10) : null)} min={10} max={600} style={{ width: 100, padding: '6px 10px', fontSize: 13, background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-primary)', fontFamily: 'var(--font-input)', outline: 'none' }} />
-                        </div>
-                      </div>
-                      <button onClick={handleGlobalDecorumSave} disabled={globalDecorumSaving || !globalDecorumDirty} style={{ marginTop: 14, padding: '6px 20px', fontSize: 13, fontWeight: 600, background: 'var(--color-accent)', color: '#FFFFFF', border: 'none', borderRadius: 6, cursor: globalDecorumDirty ? 'pointer' : 'default', opacity: globalDecorumSaving || !globalDecorumDirty ? 0.45 : 1, fontFamily: 'var(--font-input)' }}>
-                        {globalDecorumSaving ? 'Saving…' : 'Save Global Defaults'}
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                {/* ── Per-Org Override ── */}
-                <div style={{ borderRadius: 10, padding: '16px 18px', border: '1px dashed var(--color-border)' }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 4 }}>Override for this client</div>
-                  <div style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginBottom: 12, fontStyle: 'italic' }}>Leave empty to inherit global defaults</div>
-                  {decorumLoading ? (
-                    <div style={{ fontSize: 13, color: 'var(--color-text-muted)' }}>Loading…</div>
-                  ) : (
-                    <>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                        <div>
-                          <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>Staff present behavior</div>
-                          <select value={decorumRules.staffPresentBehavior ?? ''} onChange={e => handleDecorumChange('staffPresentBehavior', e.target.value || null)} style={{ width: '100%', padding: '6px 10px', fontSize: 13, background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: decorumRules.staffPresentBehavior ? 'var(--color-text-primary)' : 'var(--color-text-subtle)', fontFamily: 'var(--font-input)', outline: 'none', cursor: 'pointer' }}>
-                            <option value="">Inherit global ({BEHAVIOR_OPTIONS.find(o => o.value === globalDecorum.staffPresentBehavior)?.label ?? globalDecorum.staffPresentBehavior})</option>
-                            {BEHAVIOR_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>Staff offer trigger</div>
-                          <select value={decorumRules.staffOfferTrigger ?? ''} onChange={e => handleDecorumChange('staffOfferTrigger', e.target.value || null)} style={{ width: '100%', padding: '6px 10px', fontSize: 13, background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: decorumRules.staffOfferTrigger ? 'var(--color-text-primary)' : 'var(--color-text-subtle)', fontFamily: 'var(--font-input)', outline: 'none', cursor: 'pointer' }}>
-                            <option value="">Inherit global ({TRIGGER_OPTIONS.find(o => o.value === globalDecorum.staffOfferTrigger)?.label ?? globalDecorum.staffOfferTrigger})</option>
-                            {TRIGGER_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>Staff departure message</div>
-                          <input type="text" value={decorumRules.staffDepartureMessage ?? ''} onChange={e => handleDecorumChange('staffDepartureMessage', e.target.value)} placeholder={globalDecorum.staffDepartureMessage ? `Inherit: "${globalDecorum.staffDepartureMessage}"` : 'Inherit global default'} style={{ width: '100%', padding: '6px 10px', fontSize: 13, background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-primary)', fontFamily: 'var(--font-input)', outline: 'none', boxSizing: 'border-box' }} />
-                        </div>
-                        <div>
-                          <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 4 }}>Auto-resume timeout (seconds)</div>
-                          <div style={{ fontSize: 11, color: 'var(--color-text-subtle)', marginBottom: 4, fontStyle: 'italic' }}>How long after staff heartbeat expires before the agent auto-resumes</div>
-                          <input type="number" value={decorumRules.heartbeatTimeoutSeconds ?? ''} onChange={e => handleDecorumChange('heartbeatTimeoutSeconds', e.target.value ? parseInt(e.target.value, 10) : null)} min={10} max={600} placeholder={`Inherit: ${globalDecorum.heartbeatTimeoutSeconds ?? 90}s`} style={{ width: 140, padding: '6px 10px', fontSize: 13, background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)', borderRadius: 6, color: 'var(--color-text-primary)', fontFamily: 'var(--font-input)', outline: 'none' }} />
-                        </div>
-                      </div>
-                      <button onClick={handleDecorumSave} disabled={decorumSaving || !decorumDirty} style={{ marginTop: 14, padding: '6px 20px', fontSize: 13, fontWeight: 600, background: 'var(--color-accent)', color: '#FFFFFF', border: 'none', borderRadius: 6, cursor: decorumDirty ? 'pointer' : 'default', opacity: decorumSaving || !decorumDirty ? 0.45 : 1, fontFamily: 'var(--font-input)' }}>
-                        {decorumSaving ? 'Saving…' : 'Save Override'}
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
 
               {/* ── Noteworthy Logic ─────────────────────── */}
               <div
