@@ -11,7 +11,7 @@ export const FALLBACK_BRAND_COLORS: BrandColors = {
 };
 
 export type FieldSource = 'agent-generated' | 'integration' | 'brand-settings' | 'partner-profile';
-export type CardSource = 'Shopify' | 'Network' | 'Skill' | 'Staff' | 'Handoff';
+export type CardSource = 'Shopify' | 'Network' | 'Skill';
 
 export interface CardFieldDefinition {
   name: string;
@@ -48,8 +48,6 @@ export const CARD_SOURCE_COLORS: Record<CardSource, { bg: string; fg: string }> 
   Shopify: { bg: 'rgba(16,185,129,0.12)', fg: '#059669' },
   Network: { bg: 'rgba(245,158,11,0.12)', fg: '#d97706' },
   Skill: { bg: 'rgba(99,102,241,0.12)', fg: '#6366f1' },
-  Staff: { bg: 'rgba(236,72,153,0.12)', fg: '#db2777' },
-  Handoff: { bg: 'rgba(6,182,212,0.12)', fg: '#0891b2' },
 };
 
 export const CARD_DEFINITIONS: CardDefinition[] = [
@@ -160,45 +158,5 @@ export const CARD_DEFINITIONS: CardDefinition[] = [
         { name: 'guests', label: 'Guests', type: 'number', required: true },
       ],
     },
-  },
-  {
-    id: 'email_handoff',
-    name: 'Email Handoff',
-    description: 'Notifies the visitor that the conversation has been forwarded to the team via email',
-    triggerHint: 'Fired when the agent determines the visitor needs human follow-up and an email address is available',
-    sourceBadge: 'Handoff',
-    fields: [
-      { name: 'recipientEmail', mockValue: 'visitor@example.com', source: 'agent-generated' },
-      { name: 'message', mockValue: 'We\'ve sent a summary of this conversation to visitor@example.com. Someone from the team will follow up soon.', source: 'agent-generated' },
-    ],
-    mockData: {
-      recipientEmail: 'visitor@example.com',
-      message: 'We\'ve sent a summary of this conversation to visitor@example.com. Someone from the team will follow up soon.',
-    },
-  },
-  {
-    id: 'whatsapp_handoff',
-    name: 'WhatsApp Handoff',
-    description: 'Offers the visitor to continue the conversation on WhatsApp',
-    triggerHint: 'Fired when the agent offers to transfer the conversation to the brand\'s WhatsApp channel',
-    sourceBadge: 'Handoff',
-    fields: [
-      { name: 'whatsappNumber', mockValue: '+1 (555) 012-3456', source: 'brand-settings' },
-      { name: 'message', mockValue: 'Continue this conversation on WhatsApp', source: 'agent-generated' },
-    ],
-    mockData: {
-      whatsappNumber: '+15550123456',
-      message: 'Continue this conversation on WhatsApp',
-    },
-  },
-  {
-    id: 'sms_handoff',
-    name: 'SMS',
-    description: 'Coming soon — notify the visitor via SMS',
-    triggerHint: '',
-    sourceBadge: 'Handoff',
-    comingSoon: true,
-    fields: [],
-    mockData: {},
   },
 ];
