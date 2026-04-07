@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useWorldData } from '../../contexts/WorldDataContext';
-import { Save, Mail, Smartphone, Bell, AlertTriangle, BarChart3, UserPlus, DollarSign } from 'lucide-react';
+import { Save, Mail, Bell, AlertTriangle, BarChart3, UserPlus, DollarSign } from 'lucide-react';
 
 interface NotificationPrefs {
   dailyDigestEnabled: boolean;
@@ -98,21 +98,6 @@ const NotificationsPage: React.FC = () => {
             }}
           />
         </label>
-      </div>
-
-      {/* SMS channel — coming soon */}
-      <div style={{ ...card, opacity: 0.55, position: 'relative' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
-          <Smartphone size={18} style={{ color: 'var(--color-text-muted)' }} />
-          <h3 style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>SMS Channel</h3>
-          <span style={{
-            fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 8,
-            background: 'var(--color-neutral)', color: '#fff',
-          }}>Coming Soon</span>
-        </div>
-        <p style={{ margin: 0, fontSize: 13, color: 'var(--color-text-muted)' }}>
-          SMS notifications will be available in a future update.
-        </p>
       </div>
 
       {/* Daily Digest */}
