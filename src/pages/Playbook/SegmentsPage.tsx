@@ -1,17 +1,32 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useWorldData } from '../../contexts/WorldDataContext';
-import { Save, Trash2, Plus, RefreshCw, X, ChevronDown } from 'lucide-react';
+import { Plus, X, Save, RefreshCw, ChevronDown, Info, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react';
 
-interface Segment {
+/* ──────────────────────────── Types ──────────────────────────── */
+
+interface SegmentDef {
   segmentId: string;
   orgId: string;
   segmentName: string;
   segmentDescription: string;
-  segmentType: 'system' | 'custom';
+  segmentType: string;
   color: string;
   memberCount: number;
+  scope: string;
+  tier: 'system' | 'channel' | 'emergent';
+  channel: string;
+  rules: RuleCondition[] | null;
+  priority: number;
+  active: boolean;
+  autoActivateOn: string | null;
   createdAt: string;
   updatedAt: string;
+}
+
+interface RuleCondition {
+  attribute: string;
+  operator: string;
+  value: string;
 }
 
 interface OrgOption {
@@ -19,12 +34,9 @@ interface OrgOption {
   orgName: string;
 }
 
-interface BackfillResult {
-  orgId: string;
-  totalPersons: number;
-  reassigned: number;
-  segmentDistribution: Record<string, number>;
-}
+type TabId = 'system' | 'channel' | 'emergent';
+
+/* ──────────────────────────── Styles ─────────────────────────── */
 
 const card: React.CSSProperties = {
   background: 'var(--color-bg-surface)',
@@ -32,476 +44,643 @@ const card: React.CSSProperties = {
   borderRadius: 'var(--radius-tile)',
 };
 
+const thStyle: React.CSSProperties = {
+  padding: '8px 12px', textAlign: 'left', fontSize: 11,
+  fontWeight: 600, color: 'var(--color-text-subtle)',
+  textTransform: 'uppercase', letterSpacing: '0.06em',
+  borderBottom: '1px solid var(--color-border)',
+};
+
+const tdStyle: React.CSSProperties = {
+  padding: '10px 12px', fontSize: 13,
+  color: 'var(--color-text-primary)',
+  borderBottom: '1px solid var(--color-border)',
+};
+
+const ADMIN_KEY = 'mira-internal-admin-2026';
+
+const OPERATOR_LABELS: Record<string, string> = {
+  eq: 'is', gte: '≥', lte: '≤', gt: '>', lt: '<', contains: 'contains',
+};
+
+const CHANNEL_LABELS: Record<string, string> = {
+  universal: 'Universal', toast: 'Toast', shopify: 'Shopify', lodgify: 'Lodgify', chat: 'Chat',
+};
+
+const CHANNEL_COLORS: Record<string, string> = {
+  toast: '#ea580c', shopify: '#16a34a', lodgify: '#0284c7', universal: 'var(--color-accent)', chat: '#8b5cf6',
+};
+
+/* ──────────────────────────── Helpers ────────────────────────── */
+
+function humanizeRule(r: RuleCondition): string {
+  const op = OPERATOR_LABELS[r.operator] || r.operator;
+  const attr = r.attribute.replace(/_/g, ' ');
+  return `${attr} ${op} ${r.value}`;
+}
+
+function humanizeRules(rules: RuleCondition[] | null): string {
+  if (!rules || rules.length === 0) return '—';
+  return rules.map(humanizeRule).join(' AND ');
+}
+
+/* ──────────────────────────── Component ──────────────────────── */
+
 const SegmentsPage: React.FC = () => {
   const { apiFetch, baseApiFetch } = useWorldData();
 
-  const [orgs, setOrgs] = useState<OrgOption[]>([]);
-  const [selectedOrg, setSelectedOrg] = useState<string>('');
-  const [segments, setSegments] = useState<Segment[]>([]);
+  const [activeTab, setActiveTab] = useState<TabId>('system');
+  const [segments, setSegments] = useState<SegmentDef[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Edit state
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ segmentName: '', segmentDescription: '', color: '' });
+  // Org data for coverage panel + emergent tab
+  const [orgs, setOrgs] = useState<OrgOption[]>([]);
+  const [orgSegments, setOrgSegments] = useState<Record<string, SegmentDef[]>>({});
+  const [loadingOrgs, setLoadingOrgs] = useState(false);
+
+  // Edit modal
+  const [editSeg, setEditSeg] = useState<SegmentDef | null>(null);
+  const [editForm, setEditForm] = useState<{
+    segmentName: string; segmentDescription: string; color: string; channel: string;
+    autoActivateOn: string; priority: number; rules: RuleCondition[];
+  }>({ segmentName: '', segmentDescription: '', color: '#6b7280', channel: 'universal', autoActivateOn: '', priority: 50, rules: [] });
   const [saving, setSaving] = useState(false);
 
-  // Create state
+  // Create modal (channel tab only)
   const [showCreate, setShowCreate] = useState(false);
-  const [createForm, setCreateForm] = useState({ segmentName: '', segmentDescription: '', color: '#6b7280' });
-  const [creating, setCreating] = useState(false);
 
-  // Delete state
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  // ── Fetch global segments ─────────────────────────────────────
 
-  // Backfill state
-  const [backfilling, setBackfilling] = useState(false);
-  const [backfillResult, setBackfillResult] = useState<BackfillResult | null>(null);
-
-  // Fetch orgs on mount
-  useEffect(() => {
-    apiFetch('/clients')
-      .then((data: OrgOption[]) => {
-        const sorted = data.sort((a, b) => (a.orgName || '').localeCompare(b.orgName || ''));
-        setOrgs(sorted);
-        if (sorted.length > 0 && !selectedOrg) {
-          setSelectedOrg(sorted[0].orgId);
-        }
-      })
-      .catch(() => {});
-  }, [apiFetch]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Fetch segments when org changes
-  const fetchSegments = useCallback(async () => {
-    if (!selectedOrg) return;
+  const fetchGlobals = useCallback(async () => {
     setLoading(true);
     setError(null);
-    setBackfillResult(null);
     try {
-      const data = await baseApiFetch('/segments', {
-        headers: { 'X-Internal-Org-Id': selectedOrg },
-      });
+      const data = await baseApiFetch('/segments/global');
       setSegments(data);
     } catch (e: any) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [selectedOrg, baseApiFetch]);
+  }, [baseApiFetch]);
+
+  useEffect(() => { fetchGlobals(); }, [fetchGlobals]);
+
+  // ── Fetch orgs + per-org segments ─────────────────────────────
 
   useEffect(() => {
-    fetchSegments();
-  }, [fetchSegments]);
+    apiFetch('/clients').then((data: OrgOption[]) => {
+      setOrgs(data.sort((a, b) => (a.orgName || '').localeCompare(b.orgName || '')));
+    }).catch(() => {});
+  }, [apiFetch]);
 
-  // Edit
-  const startEdit = (seg: Segment) => {
-    setEditingId(seg.segmentId);
+  const fetchOrgSegments = useCallback(async () => {
+    if (orgs.length === 0) return;
+    setLoadingOrgs(true);
+    const result: Record<string, SegmentDef[]> = {};
+    for (const org of orgs) {
+      try {
+        const data = await baseApiFetch(`/segments/v2?orgId=${encodeURIComponent(org.orgId)}`);
+        result[org.orgId] = data;
+      } catch { /* skip */ }
+    }
+    setOrgSegments(result);
+    setLoadingOrgs(false);
+  }, [orgs, baseApiFetch]);
+
+  useEffect(() => { fetchOrgSegments(); }, [fetchOrgSegments]);
+
+  // ── Derived data ──────────────────────────────────────────────
+
+  const systemSegs = segments.filter(s => s.tier === 'system' || (!s.tier && s.segmentType === 'system'));
+  const channelSegs = segments.filter(s => s.tier === 'channel');
+
+  const emergentSegs: (SegmentDef & { orgName: string })[] = [];
+  for (const org of orgs) {
+    const segs = orgSegments[org.orgId] || [];
+    for (const s of segs) {
+      if (s.tier === 'emergent') {
+        emergentSegs.push({ ...s, orgName: org.orgName || org.orgId });
+      }
+    }
+  }
+
+  // Count active orgs per channel segment
+  function activeOrgCount(seg: SegmentDef): number {
+    let count = 0;
+    for (const org of orgs) {
+      const segs = orgSegments[org.orgId] || [];
+      const match = segs.find(s => s.segmentId === seg.segmentId);
+      if (match && match.active) count++;
+    }
+    return count;
+  }
+
+  // ── Edit modal handlers ───────────────────────────────────────
+
+  const openEdit = (seg: SegmentDef) => {
+    setEditSeg(seg);
     setEditForm({
       segmentName: seg.segmentName,
-      segmentDescription: seg.segmentDescription,
+      segmentDescription: seg.segmentDescription || '',
       color: seg.color,
+      channel: seg.channel || 'universal',
+      autoActivateOn: seg.autoActivateOn || '',
+      priority: seg.priority ?? 50,
+      rules: seg.rules ? seg.rules.map(r => ({ ...r })) : [],
     });
+    setShowCreate(false);
   };
 
-  const handleSaveEdit = async () => {
-    if (!editingId || !selectedOrg) return;
+  const openCreate = () => {
+    setEditSeg(null);
+    setEditForm({
+      segmentName: '', segmentDescription: '', color: '#6b7280',
+      channel: 'toast', autoActivateOn: '', priority: 50, rules: [{ attribute: '', operator: 'eq', value: '' }],
+    });
+    setShowCreate(true);
+  };
+
+  const handleSave = async () => {
     setSaving(true);
     try {
-      const updated = await baseApiFetch(`/segments/${encodeURIComponent(editingId)}`, {
-        method: 'PUT',
-        headers: { 'X-Internal-Org-Id': selectedOrg },
-        body: JSON.stringify(editForm),
-      });
-      setSegments(prev => prev.map(s => s.segmentId === editingId ? { ...s, ...updated } : s));
-      setEditingId(null);
+      if (showCreate) {
+        // Create new global channel segment via seed update
+        const body = {
+          segmentName: editForm.segmentName,
+          segmentDescription: editForm.segmentDescription,
+          color: editForm.color,
+          channel: editForm.channel,
+          autoActivateOn: editForm.autoActivateOn || null,
+          priority: editForm.priority,
+          rules: editForm.rules.filter(r => r.attribute.trim()),
+          active: true,
+        };
+        await baseApiFetch('/segments/v2', {
+          method: 'POST',
+          body: JSON.stringify({ ...body, orgId: 'global', tier: 'channel', scope: 'global' }),
+        });
+      } else if (editSeg) {
+        const body = {
+          segmentName: editForm.segmentName,
+          segmentDescription: editForm.segmentDescription,
+          color: editForm.color,
+          channel: editForm.channel,
+          autoActivateOn: editForm.autoActivateOn || null,
+          priority: editForm.priority,
+          rules: editForm.rules.filter(r => r.attribute.trim()),
+        };
+        await baseApiFetch(`/segments/v2/${encodeURIComponent(editSeg.segmentId)}?orgId=${encodeURIComponent(editSeg.orgId)}`, {
+          method: 'PUT',
+          headers: { 'X-Admin-Key': ADMIN_KEY },
+          body: JSON.stringify(body),
+        });
+      }
+      setEditSeg(null);
+      setShowCreate(false);
+      await fetchGlobals();
     } catch (e: any) {
-      alert('Failed to save: ' + e.message);
+      alert('Save failed: ' + e.message);
     } finally {
       setSaving(false);
     }
   };
 
-  // Create
-  const handleCreate = async () => {
-    if (!selectedOrg || !createForm.segmentName.trim()) return;
-    setCreating(true);
+  // ── Toggle active for emergent segments ───────────────────────
+
+  const toggleEmergent = async (seg: SegmentDef & { orgName: string }) => {
     try {
-      const created = await baseApiFetch('/segments', {
-        method: 'POST',
-        headers: { 'X-Internal-Org-Id': selectedOrg },
-        body: JSON.stringify(createForm),
+      await baseApiFetch(`/segments/v2/${encodeURIComponent(seg.segmentId)}?orgId=${encodeURIComponent(seg.orgId)}`, {
+        method: 'PUT',
+        body: JSON.stringify({ active: !seg.active }),
       });
-      setSegments(prev => [...prev, created]);
-      setShowCreate(false);
-      setCreateForm({ segmentName: '', segmentDescription: '', color: '#6b7280' });
+      await fetchOrgSegments();
     } catch (e: any) {
-      alert('Failed to create: ' + e.message);
-    } finally {
-      setCreating(false);
+      alert('Toggle failed: ' + e.message);
     }
   };
 
-  // Delete
-  const handleDelete = async (segmentId: string) => {
-    if (!selectedOrg) return;
-    setDeletingId(segmentId);
-    try {
-      await baseApiFetch(`/segments/${encodeURIComponent(segmentId)}`, {
-        method: 'DELETE',
-        headers: { 'X-Internal-Org-Id': selectedOrg },
-      });
-      setSegments(prev => prev.filter(s => s.segmentId !== segmentId));
-    } catch (e: any) {
-      alert('Failed to delete: ' + e.message);
-    } finally {
-      setDeletingId(null);
-    }
-  };
+  // ── Tab style ─────────────────────────────────────────────────
 
-  // Backfill
-  const handleBackfill = async () => {
-    if (!selectedOrg) return;
-    if (!window.confirm(`Re-classify all users for ${orgs.find(o => o.orgId === selectedOrg)?.orgName || selectedOrg}? This will update segment assignments based on current user attributes.`)) return;
-    setBackfilling(true);
-    setBackfillResult(null);
-    try {
-      const result = await apiFetch('/segments/backfill', {
-        method: 'POST',
-        body: JSON.stringify({ orgId: selectedOrg }),
-      });
-      setBackfillResult(result);
-      // Refresh segments to get updated counts
-      await fetchSegments();
-    } catch (e: any) {
-      alert('Backfill failed: ' + e.message);
-    } finally {
-      setBackfilling(false);
-    }
-  };
+  const tabStyle = (id: TabId): React.CSSProperties => ({
+    padding: '8px 18px', fontWeight: activeTab === id ? 600 : 400, fontSize: 13,
+    color: activeTab === id ? 'var(--color-accent)' : 'var(--color-text-muted)',
+    borderBottom: activeTab === id ? '2px solid var(--color-accent)' : '2px solid transparent',
+    background: 'none', border: 'none', cursor: 'pointer',
+    fontFamily: 'var(--font-primary)', transition: 'color 0.15s',
+  });
 
-  // Backfill all orgs
-  const handleBackfillAll = async () => {
-    if (!window.confirm('Re-classify users for ALL organizations? This may take a while.')) return;
-    setBackfilling(true);
-    setBackfillResult(null);
-    try {
-      const result = await apiFetch('/segments/backfill-all', {
-        method: 'POST',
-        body: JSON.stringify({}),
-      });
-      setBackfillResult({
-        orgId: 'ALL',
-        totalPersons: result.totalPersons || 0,
-        reassigned: result.totalReassigned || 0,
-        segmentDistribution: {},
-      });
-      await fetchSegments();
-    } catch (e: any) {
-      alert('Backfill all failed: ' + e.message);
-    } finally {
-      setBackfilling(false);
-    }
-  };
-
-  const selectedOrgName = orgs.find(o => o.orgId === selectedOrg)?.orgName || '';
+  // ── Render ────────────────────────────────────────────────────
 
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, color: 'var(--color-text-primary)' }}>Segments</h1>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button
-            onClick={handleBackfill}
-            disabled={backfilling || !selectedOrg}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 14px', background: 'var(--color-bg-surface)',
-              border: '1px solid var(--color-border)', borderRadius: 8,
-              fontSize: 12, fontWeight: 500, cursor: backfilling ? 'wait' : 'pointer',
-              fontFamily: 'var(--font-primary)', color: 'var(--color-text-primary)',
-              opacity: backfilling ? 0.6 : 1,
-            }}
-          >
-            <RefreshCw size={12} style={{ animation: backfilling ? 'spin 1s linear infinite' : 'none' }} />
-            {backfilling ? 'Re-classifying...' : 'Re-classify org'}
+        {activeTab === 'channel' && (
+          <button onClick={openCreate} style={{
+            display: 'flex', alignItems: 'center', gap: 6,
+            padding: '8px 14px', background: 'var(--color-accent)',
+            border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 500,
+            cursor: 'pointer', fontFamily: 'var(--font-primary)', color: '#FFFFFF',
+          }}>
+            <Plus size={12} /> Add Channel Segment
           </button>
-          <button
-            onClick={handleBackfillAll}
-            disabled={backfilling}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 14px', background: 'var(--color-accent)',
-              border: 'none', borderRadius: 8,
-              fontSize: 12, fontWeight: 500, cursor: backfilling ? 'wait' : 'pointer',
-              fontFamily: 'var(--font-primary)', color: '#FFFFFF',
-              opacity: backfilling ? 0.6 : 1,
-            }}
-          >
-            <RefreshCw size={12} />
-            Re-classify all orgs
-          </button>
-        </div>
+        )}
       </div>
 
-      {/* Org selector */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Organization
-        </label>
-        <div style={{ position: 'relative' }}>
-          <select
-            value={selectedOrg}
-            onChange={(e) => setSelectedOrg(e.target.value)}
-            style={{
-              appearance: 'none', padding: '8px 32px 8px 12px',
-              background: 'var(--color-bg-surface)', border: '1px solid var(--color-border)',
-              borderRadius: 8, fontSize: 13, fontFamily: 'var(--font-input)',
-              color: 'var(--color-text-primary)', cursor: 'pointer', minWidth: 220,
-            }}
-          >
-            {orgs.map(org => (
-              <option key={org.orgId} value={org.orgId}>
-                {org.orgName || org.orgId}
-              </option>
-            ))}
-          </select>
-          <ChevronDown size={14} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: 'var(--color-text-muted)' }} />
-        </div>
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--color-border)' }}>
+        <button style={tabStyle('system')} onClick={() => setActiveTab('system')}>System</button>
+        <button style={tabStyle('channel')} onClick={() => setActiveTab('channel')}>Channel</button>
+        <button style={tabStyle('emergent')} onClick={() => setActiveTab('emergent')}>Emergent</button>
       </div>
 
-      {/* Backfill result banner */}
-      {backfillResult && (
-        <div style={{
-          ...card, padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: 'rgba(74, 108, 111, 0.08)', borderColor: 'var(--color-accent)',
-        }}>
-          <div style={{ fontSize: 13, color: 'var(--color-text-primary)' }}>
-            <strong>{backfillResult.reassigned}</strong> of {backfillResult.totalPersons} users re-classified
-            {backfillResult.orgId === 'ALL' ? ' across all orgs' : ` for ${selectedOrgName}`}.
-            {backfillResult.segmentDistribution && Object.keys(backfillResult.segmentDistribution).length > 0 && (
-              <span style={{ marginLeft: 12, color: 'var(--color-text-muted)', fontSize: 12 }}>
-                {Object.entries(backfillResult.segmentDistribution).map(([k, v]) => `${k}: ${v}`).join(' · ')}
-              </span>
-            )}
-          </div>
-          <button onClick={() => setBackfillResult(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)' }}>
-            <X size={14} />
-          </button>
-        </div>
-      )}
-
-      {/* Loading / Error */}
       {loading && <div style={{ padding: 16, color: 'var(--color-text-muted)', fontSize: 13 }}>Loading segments...</div>}
       {error && <div style={{ padding: 16, color: 'var(--color-negative)', fontSize: 13 }}>{error}</div>}
 
-      {/* Segments list */}
-      {!loading && !error && segments.map(seg => {
-        const isEditing = editingId === seg.segmentId;
-
-        return (
-          <div key={seg.segmentId} style={card}>
-            <div style={{ padding: '16px 20px', display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-              {/* Color swatch */}
-              <div style={{
-                width: 10, height: 10, borderRadius: '50%', background: seg.color,
-                marginTop: 5, flexShrink: 0,
-              }} />
-
-              <div style={{ flex: 1, minWidth: 0 }}>
-                {isEditing ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <div style={{ display: 'flex', gap: 10 }}>
-                      <input
-                        value={editForm.segmentName}
-                        onChange={e => setEditForm(f => ({ ...f, segmentName: e.target.value }))}
-                        style={{
-                          flex: 1, padding: '6px 10px', background: 'var(--color-bg-primary)',
-                          border: '1px solid var(--color-border)', borderRadius: 6,
-                          fontSize: 13, fontFamily: 'var(--font-input)', color: 'var(--color-text-primary)',
-                        }}
-                        placeholder="Segment name"
-                      />
-                      <input
-                        type="color"
-                        value={editForm.color}
-                        onChange={e => setEditForm(f => ({ ...f, color: e.target.value }))}
-                        style={{ width: 32, height: 32, border: 'none', background: 'none', cursor: 'pointer' }}
-                      />
-                    </div>
-                    <textarea
-                      value={editForm.segmentDescription}
-                      onChange={e => setEditForm(f => ({ ...f, segmentDescription: e.target.value }))}
-                      rows={2}
-                      style={{
-                        width: '100%', padding: '6px 10px', background: 'var(--color-bg-primary)',
-                        border: '1px solid var(--color-border)', borderRadius: 6,
-                        fontSize: 12, fontFamily: 'var(--font-input)', color: 'var(--color-text-primary)',
-                        resize: 'vertical', boxSizing: 'border-box',
-                      }}
-                      placeholder="Segment description"
-                    />
-                    <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-                      <button
-                        onClick={() => setEditingId(null)}
-                        style={{
-                          padding: '6px 12px', background: 'none', border: '1px solid var(--color-border)',
-                          borderRadius: 6, fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-primary)',
-                          color: 'var(--color-text-muted)',
-                        }}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleSaveEdit}
-                        disabled={saving || !editForm.segmentName.trim()}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 4,
-                          padding: '6px 12px', background: 'var(--color-accent)', color: '#FFFFFF',
-                          border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 500,
-                          cursor: 'pointer', fontFamily: 'var(--font-primary)',
-                          opacity: saving ? 0.6 : 1,
-                        }}
-                      >
-                        <Save size={12} />
-                        {saving ? 'Saving...' : 'Save'}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <>
+      {/* ─── System tab ─────────────────────────────────────────── */}
+      {!loading && activeTab === 'system' && (
+        <div style={card}>
+          <div style={{ padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 8, borderBottom: '1px solid var(--color-border)' }}>
+            <Info size={13} style={{ color: 'var(--color-text-subtle)' }} />
+            <span style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+              System segments are assigned automatically by Mira's analysis pipeline. They cannot be edited.
+            </span>
+          </div>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={thStyle}>Name</th>
+                <th style={thStyle}>Color</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>Priority</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>Members</th>
+              </tr>
+            </thead>
+            <tbody>
+              {systemSegs.map(seg => (
+                <tr key={seg.segmentId}>
+                  <td style={tdStyle}>
+                    <div style={{ fontWeight: 500 }}>{seg.segmentName}</div>
+                    <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 2 }}>{seg.segmentDescription}</div>
+                  </td>
+                  <td style={tdStyle}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--color-text-primary)' }}>{seg.segmentName}</span>
-                      <span style={{
-                        fontSize: 10, padding: '2px 6px', borderRadius: 4,
-                        background: seg.segmentType === 'system' ? 'var(--color-accent-muted)' : 'rgba(168,89,81,0.08)',
-                        color: seg.segmentType === 'system' ? 'var(--color-accent)' : '#A85951',
-                      }}>
-                        {seg.segmentType}
-                      </span>
-                      <span style={{ fontSize: 11, color: 'var(--color-text-subtle)', fontFamily: 'var(--font-input)' }}>{seg.segmentId}</span>
+                      <div style={{ width: 14, height: 14, borderRadius: 4, background: seg.color, flexShrink: 0 }} />
+                      <span style={{ fontSize: 11, color: 'var(--color-text-subtle)', fontFamily: 'var(--font-input)' }}>{seg.color}</span>
                     </div>
-                    <div style={{ fontSize: 12, color: 'var(--color-text-muted)', marginTop: 3 }}>{seg.segmentDescription}</div>
-                  </>
-                )}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'var(--font-input)' }}>{seg.priority}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 500 }}>{seg.memberCount.toLocaleString()}</td>
+                </tr>
+              ))}
+              {systemSegs.length === 0 && (
+                <tr><td colSpan={4} style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-subtle)' }}>No system segments found. Run seed-globals first.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ─── Channel tab ────────────────────────────────────────── */}
+      {!loading && activeTab === 'channel' && (
+        <div style={card}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={thStyle}>Name</th>
+                <th style={thStyle}>Channel</th>
+                <th style={thStyle}>Rules</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>Priority</th>
+                <th style={{ ...thStyle, textAlign: 'right' }}>Active Orgs</th>
+                <th style={{ ...thStyle, textAlign: 'center' }}>Edit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {channelSegs.map(seg => (
+                <tr key={seg.segmentId}>
+                  <td style={tdStyle}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 12, height: 12, borderRadius: 3, background: seg.color, flexShrink: 0 }} />
+                      <span style={{ fontWeight: 500 }}>{seg.segmentName}</span>
+                    </div>
+                  </td>
+                  <td style={tdStyle}>
+                    <span style={{
+                      fontSize: 11, padding: '2px 8px', borderRadius: 4, fontWeight: 500,
+                      background: `${CHANNEL_COLORS[seg.channel] || 'var(--color-accent)'}15`,
+                      color: CHANNEL_COLORS[seg.channel] || 'var(--color-accent)',
+                    }}>
+                      {CHANNEL_LABELS[seg.channel] || seg.channel}
+                    </span>
+                  </td>
+                  <td style={{ ...tdStyle, fontSize: 12, color: 'var(--color-text-muted)', maxWidth: 280 }}>
+                    {humanizeRules(seg.rules)}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'right', fontFamily: 'var(--font-input)' }}>{seg.priority}</td>
+                  <td style={{ ...tdStyle, textAlign: 'right', fontWeight: 500 }}>{activeOrgCount(seg)}</td>
+                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                    <button onClick={() => openEdit(seg)} style={{
+                      padding: '4px 10px', background: 'none',
+                      border: '1px solid var(--color-border)', borderRadius: 6,
+                      fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-primary)',
+                      color: 'var(--color-text-muted)',
+                    }}>Edit</button>
+                  </td>
+                </tr>
+              ))}
+              {channelSegs.length === 0 && (
+                <tr><td colSpan={6} style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-subtle)' }}>No channel segments. Add one or run seed-globals.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ─── Emergent tab ───────────────────────────────────────── */}
+      {!loading && activeTab === 'emergent' && (
+        <div style={card}>
+          {loadingOrgs && <div style={{ padding: 16, color: 'var(--color-text-muted)', fontSize: 13 }}>Loading org segments...</div>}
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={thStyle}>Name</th>
+                <th style={thStyle}>Org</th>
+                <th style={thStyle}>Color</th>
+                <th style={thStyle}>Rules</th>
+                <th style={thStyle}>Created</th>
+                <th style={{ ...thStyle, textAlign: 'center' }}>Active</th>
+              </tr>
+            </thead>
+            <tbody>
+              {emergentSegs.map(seg => (
+                <tr key={`${seg.orgId}-${seg.segmentId}`}>
+                  <td style={{ ...tdStyle, fontWeight: 500 }}>{seg.segmentName}</td>
+                  <td style={{ ...tdStyle, fontSize: 12, color: 'var(--color-text-muted)' }}>{seg.orgName}</td>
+                  <td style={tdStyle}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ width: 12, height: 12, borderRadius: 3, background: seg.color }} />
+                      <span style={{ fontSize: 11, color: 'var(--color-text-subtle)', fontFamily: 'var(--font-input)' }}>{seg.color}</span>
+                    </div>
+                  </td>
+                  <td style={{ ...tdStyle, fontSize: 12, color: 'var(--color-text-muted)', maxWidth: 240 }}>
+                    {humanizeRules(seg.rules)}
+                  </td>
+                  <td style={{ ...tdStyle, fontSize: 12, color: 'var(--color-text-muted)' }}>
+                    {seg.createdAt ? new Date(seg.createdAt).toLocaleDateString() : '—'}
+                  </td>
+                  <td style={{ ...tdStyle, textAlign: 'center' }}>
+                    <button onClick={() => toggleEmergent(seg)} style={{
+                      background: 'none', border: 'none', cursor: 'pointer',
+                      color: seg.active ? 'var(--color-accent)' : 'var(--color-text-subtle)',
+                    }}>
+                      {seg.active ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {emergentSegs.length === 0 && !loadingOrgs && (
+                <tr><td colSpan={6} style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-subtle)' }}>No emergent segments yet. These are auto-created by the agent.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ─── Org coverage panel ──────────────────────────────────── */}
+      <div style={{ marginTop: 8 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)', margin: '0 0 8px' }}>Org Coverage</h2>
+        <div style={card}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={thStyle}>Organization</th>
+                <th style={thStyle}>Active Segments</th>
+                <th style={thStyle}>Integrations</th>
+              </tr>
+            </thead>
+            <tbody>
+              {orgs.map(org => {
+                const segs = orgSegments[org.orgId] || [];
+                const activeNames = segs.filter(s => s.active !== false).map(s => s.segmentName);
+                const integrations: string[] = [];
+                if (segs.some(s => s.channel === 'toast' && s.active)) integrations.push('Toast');
+                if (segs.some(s => s.channel === 'shopify' && s.active)) integrations.push('Shopify');
+                if (segs.some(s => s.channel === 'lodgify' && s.active)) integrations.push('Lodgify');
+
+                return (
+                  <tr key={org.orgId}>
+                    <td style={{ ...tdStyle, fontWeight: 500 }}>{org.orgName || org.orgId}</td>
+                    <td style={{ ...tdStyle, fontSize: 12, color: 'var(--color-text-muted)' }}>
+                      {activeNames.length > 0 ? activeNames.join(', ') : <span style={{ color: 'var(--color-text-subtle)' }}>—</span>}
+                    </td>
+                    <td style={tdStyle}>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        {integrations.map(i => (
+                          <span key={i} style={{
+                            fontSize: 10, padding: '2px 6px', borderRadius: 4, fontWeight: 500,
+                            background: `${CHANNEL_COLORS[i.toLowerCase()] || 'var(--color-accent)'}15`,
+                            color: CHANNEL_COLORS[i.toLowerCase()] || 'var(--color-accent)',
+                          }}>{i}</span>
+                        ))}
+                        {integrations.length === 0 && <span style={{ fontSize: 11, color: 'var(--color-text-subtle)' }}>—</span>}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {orgs.length === 0 && (
+                <tr><td colSpan={3} style={{ ...tdStyle, textAlign: 'center', color: 'var(--color-text-subtle)' }}>Loading organizations...</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ─── Edit / Create Modal ─────────────────────────────────── */}
+      {(editSeg || showCreate) && (
+        <div onClick={() => { setEditSeg(null); setShowCreate(false); }} style={{
+          position: 'fixed', inset: 0, zIndex: 200,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(44,40,37,0.5)', backdropFilter: 'blur(2px)',
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            position: 'relative', width: '90vw', maxWidth: 600, maxHeight: '85vh',
+            background: 'var(--color-bg-surface)', borderRadius: 16,
+            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.25)',
+          }}>
+            {/* Modal header */}
+            <div style={{
+              padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              borderBottom: '1px solid var(--color-border)',
+            }}>
+              <span style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+                {showCreate ? 'New Channel Segment' : `Edit: ${editSeg?.segmentName}`}
+              </span>
+              <button onClick={() => { setEditSeg(null); setShowCreate(false); }} style={{
+                background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-text-muted)',
+              }}><X size={16} /></button>
+            </div>
+
+            {/* Modal body */}
+            <div style={{ padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+              {/* Name + Color */}
+              <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Name</label>
+                  <input value={editForm.segmentName} onChange={e => setEditForm(f => ({ ...f, segmentName: e.target.value }))}
+                    style={{
+                      width: '100%', padding: '8px 10px', marginTop: 4, background: 'var(--color-bg-primary)',
+                      border: '1px solid var(--color-border)', borderRadius: 6,
+                      fontSize: 13, fontFamily: 'var(--font-input)', color: 'var(--color-text-primary)', boxSizing: 'border-box',
+                    }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Color</label>
+                  <input type="color" value={editForm.color} onChange={e => setEditForm(f => ({ ...f, color: e.target.value }))}
+                    style={{ display: 'block', width: 38, height: 38, marginTop: 4, border: 'none', background: 'none', cursor: 'pointer' }} />
+                </div>
               </div>
 
-              {/* Count + Actions */}
-              {!isEditing && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--color-text-primary)' }}>
-                    {seg.memberCount} <span style={{ fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 400 }}>
-                      {seg.memberCount === 1 ? 'person' : 'people'}
-                    </span>
-                  </span>
-                  <button
-                    onClick={() => startEdit(seg)}
-                    style={{
-                      padding: '4px 8px', background: 'none', border: '1px solid var(--color-border)',
-                      borderRadius: 6, fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-primary)',
-                      color: 'var(--color-text-muted)',
-                    }}
-                  >
-                    Edit
-                  </button>
-                  {seg.segmentType === 'custom' && (
-                    <button
-                      onClick={() => handleDelete(seg.segmentId)}
-                      disabled={deletingId === seg.segmentId}
-                      style={{
-                        padding: '4px 8px', background: 'none', border: '1px solid rgba(168,89,81,0.3)',
-                        borderRadius: 6, fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-primary)',
-                        color: '#A85951', opacity: deletingId === seg.segmentId ? 0.5 : 1,
-                      }}
-                    >
-                      <Trash2 size={11} />
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      })}
+              {/* Description */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Description</label>
+                <textarea value={editForm.segmentDescription} onChange={e => setEditForm(f => ({ ...f, segmentDescription: e.target.value }))}
+                  rows={2}
+                  style={{
+                    width: '100%', padding: '8px 10px', marginTop: 4, background: 'var(--color-bg-primary)',
+                    border: '1px solid var(--color-border)', borderRadius: 6,
+                    fontSize: 12, fontFamily: 'var(--font-input)', color: 'var(--color-text-primary)',
+                    resize: 'vertical', boxSizing: 'border-box',
+                  }} />
+              </div>
 
-      {/* Create new segment */}
-      {showCreate ? (
-        <div style={card}>
-          <div style={{ padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text-primary)' }}>New Custom Segment</div>
-            <div style={{ display: 'flex', gap: 10 }}>
-              <input
-                value={createForm.segmentName}
-                onChange={e => setCreateForm(f => ({ ...f, segmentName: e.target.value }))}
-                placeholder="Segment name"
-                style={{
-                  flex: 1, padding: '6px 10px', background: 'var(--color-bg-primary)',
-                  border: '1px solid var(--color-border)', borderRadius: 6,
-                  fontSize: 13, fontFamily: 'var(--font-input)', color: 'var(--color-text-primary)',
-                }}
-              />
-              <input
-                type="color"
-                value={createForm.color}
-                onChange={e => setCreateForm(f => ({ ...f, color: e.target.value }))}
-                style={{ width: 32, height: 32, border: 'none', background: 'none', cursor: 'pointer' }}
-              />
+              {/* Channel + AutoActivate + Priority */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Channel</label>
+                  <select value={editForm.channel} onChange={e => setEditForm(f => ({ ...f, channel: e.target.value }))}
+                    style={{
+                      width: '100%', padding: '8px 10px', marginTop: 4, background: 'var(--color-bg-primary)',
+                      border: '1px solid var(--color-border)', borderRadius: 6, fontSize: 13,
+                      fontFamily: 'var(--font-input)', color: 'var(--color-text-primary)', appearance: 'none',
+                    }}>
+                    <option value="universal">Universal</option>
+                    <option value="toast">Toast</option>
+                    <option value="shopify">Shopify</option>
+                    <option value="lodgify">Lodgify</option>
+                    <option value="chat">Chat</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Auto-activate on</label>
+                  <input value={editForm.autoActivateOn} onChange={e => setEditForm(f => ({ ...f, autoActivateOn: e.target.value }))}
+                    placeholder="toast / shopify / lodgify"
+                    style={{
+                      width: '100%', padding: '8px 10px', marginTop: 4, background: 'var(--color-bg-primary)',
+                      border: '1px solid var(--color-border)', borderRadius: 6, fontSize: 13,
+                      fontFamily: 'var(--font-input)', color: 'var(--color-text-primary)', boxSizing: 'border-box',
+                    }} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Priority</label>
+                  <input type="number" value={editForm.priority} onChange={e => setEditForm(f => ({ ...f, priority: parseInt(e.target.value) || 0 }))}
+                    style={{
+                      width: '100%', padding: '8px 10px', marginTop: 4, background: 'var(--color-bg-primary)',
+                      border: '1px solid var(--color-border)', borderRadius: 6, fontSize: 13,
+                      fontFamily: 'var(--font-input)', color: 'var(--color-text-primary)', boxSizing: 'border-box',
+                    }} />
+                </div>
+              </div>
+
+              {/* Rules builder */}
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 600, color: 'var(--color-text-subtle)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6, display: 'block' }}>
+                  Rules (all must match)
+                </label>
+                {editForm.rules.map((rule, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+                    <input value={rule.attribute} placeholder="attribute key"
+                      onChange={e => {
+                        const updated = [...editForm.rules];
+                        updated[idx] = { ...updated[idx], attribute: e.target.value };
+                        setEditForm(f => ({ ...f, rules: updated }));
+                      }}
+                      style={{
+                        flex: 2, padding: '6px 8px', background: 'var(--color-bg-primary)',
+                        border: '1px solid var(--color-border)', borderRadius: 6,
+                        fontSize: 12, fontFamily: 'var(--font-input)', color: 'var(--color-text-primary)',
+                      }} />
+                    <select value={rule.operator}
+                      onChange={e => {
+                        const updated = [...editForm.rules];
+                        updated[idx] = { ...updated[idx], operator: e.target.value };
+                        setEditForm(f => ({ ...f, rules: updated }));
+                      }}
+                      style={{
+                        flex: 1, padding: '6px 8px', background: 'var(--color-bg-primary)',
+                        border: '1px solid var(--color-border)', borderRadius: 6,
+                        fontSize: 12, fontFamily: 'var(--font-input)', color: 'var(--color-text-primary)', appearance: 'none',
+                      }}>
+                      <option value="eq">is</option>
+                      <option value="gte">≥</option>
+                      <option value="lte">≤</option>
+                      <option value="gt">&gt;</option>
+                      <option value="lt">&lt;</option>
+                      <option value="contains">contains</option>
+                    </select>
+                    <input value={rule.value} placeholder="value"
+                      onChange={e => {
+                        const updated = [...editForm.rules];
+                        updated[idx] = { ...updated[idx], value: e.target.value };
+                        setEditForm(f => ({ ...f, rules: updated }));
+                      }}
+                      style={{
+                        flex: 1, padding: '6px 8px', background: 'var(--color-bg-primary)',
+                        border: '1px solid var(--color-border)', borderRadius: 6,
+                        fontSize: 12, fontFamily: 'var(--font-input)', color: 'var(--color-text-primary)',
+                      }} />
+                    <button onClick={() => {
+                      setEditForm(f => ({ ...f, rules: f.rules.filter((_, i) => i !== idx) }));
+                    }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-negative)', padding: 4 }}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+                <button onClick={() => setEditForm(f => ({ ...f, rules: [...f.rules, { attribute: '', operator: 'eq', value: '' }] }))}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 4, padding: '4px 10px',
+                    background: 'none', border: '1px dashed var(--color-border)', borderRadius: 6,
+                    fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-primary)', color: 'var(--color-text-muted)',
+                  }}>
+                  <Plus size={11} /> Add condition
+                </button>
+              </div>
             </div>
-            <textarea
-              value={createForm.segmentDescription}
-              onChange={e => setCreateForm(f => ({ ...f, segmentDescription: e.target.value }))}
-              rows={2}
-              placeholder="Description — used by the LLM to classify customers"
-              style={{
-                width: '100%', padding: '6px 10px', background: 'var(--color-bg-primary)',
-                border: '1px solid var(--color-border)', borderRadius: 6,
-                fontSize: 12, fontFamily: 'var(--font-input)', color: 'var(--color-text-primary)',
-                resize: 'vertical', boxSizing: 'border-box',
-              }}
-            />
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => { setShowCreate(false); setCreateForm({ segmentName: '', segmentDescription: '', color: '#6b7280' }); }}
-                style={{
-                  padding: '6px 12px', background: 'none', border: '1px solid var(--color-border)',
-                  borderRadius: 6, fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-primary)',
-                  color: 'var(--color-text-muted)',
-                }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreate}
-                disabled={creating || !createForm.segmentName.trim()}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 4,
-                  padding: '6px 12px', background: 'var(--color-accent)', color: '#FFFFFF',
-                  border: 'none', borderRadius: 6, fontSize: 12, fontWeight: 500,
-                  cursor: 'pointer', fontFamily: 'var(--font-primary)',
-                  opacity: creating ? 0.6 : 1,
-                }}
-              >
-                <Plus size={12} />
-                {creating ? 'Creating...' : 'Create'}
+
+            {/* Modal footer */}
+            <div style={{
+              padding: '12px 20px', display: 'flex', justifyContent: 'flex-end', gap: 8,
+              borderTop: '1px solid var(--color-border)',
+            }}>
+              <button onClick={() => { setEditSeg(null); setShowCreate(false); }} style={{
+                padding: '8px 14px', background: 'none', border: '1px solid var(--color-border)',
+                borderRadius: 8, fontSize: 12, cursor: 'pointer', fontFamily: 'var(--font-primary)',
+                color: 'var(--color-text-muted)',
+              }}>Cancel</button>
+              <button onClick={handleSave} disabled={saving || !editForm.segmentName.trim()} style={{
+                display: 'flex', alignItems: 'center', gap: 4,
+                padding: '8px 14px', background: 'var(--color-accent)', color: '#FFFFFF',
+                border: 'none', borderRadius: 8, fontSize: 12, fontWeight: 500,
+                cursor: 'pointer', fontFamily: 'var(--font-primary)', opacity: saving ? 0.6 : 1,
+              }}>
+                <Save size={12} /> {saving ? 'Saving...' : 'Save'}
               </button>
             </div>
           </div>
         </div>
-      ) : (
-        <button
-          onClick={() => setShowCreate(true)}
-          disabled={!selectedOrg}
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            padding: '12px 20px', background: 'none',
-            border: '1px dashed var(--color-border)', borderRadius: 'var(--radius-tile)',
-            fontSize: 13, color: 'var(--color-text-muted)', cursor: 'pointer',
-            fontFamily: 'var(--font-primary)', transition: 'border-color 0.15s',
-          }}
-        >
-          <Plus size={14} />
-          Add custom segment
-        </button>
       )}
 
       <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
