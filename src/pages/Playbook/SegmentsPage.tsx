@@ -17,7 +17,7 @@ interface SegmentDef {
   channel: string;
   rules: RuleCondition[] | null;
   priority: number;
-  active: boolean;
+  active: string;  // "true" | "false"
   autoActivateOn: string | null;
   createdAt: string;
   updatedAt: string;
@@ -172,7 +172,7 @@ const SegmentsPage: React.FC = () => {
     for (const org of orgs) {
       const segs = orgSegments[org.orgId] || [];
       const match = segs.find(s => s.segmentId === seg.segmentId);
-      if (match && match.active) count++;
+      if (match && match.active === 'true') count++;
     }
     return count;
   }
@@ -253,7 +253,7 @@ const SegmentsPage: React.FC = () => {
     try {
       await baseApiFetch(`/segments/v2/${encodeURIComponent(seg.segmentId)}?orgId=${encodeURIComponent(seg.orgId)}`, {
         method: 'PUT',
-        body: JSON.stringify({ active: !seg.active }),
+        body: JSON.stringify({ active: seg.active === 'true' ? 'false' : 'true' }),
       });
       await fetchOrgSegments();
     } catch (e: any) {
@@ -433,9 +433,9 @@ const SegmentsPage: React.FC = () => {
                   <td style={{ ...tdStyle, textAlign: 'center' }}>
                     <button onClick={() => toggleEmergent(seg)} style={{
                       background: 'none', border: 'none', cursor: 'pointer',
-                      color: seg.active ? 'var(--color-accent)' : 'var(--color-text-subtle)',
+                      color: seg.active === 'true' ? 'var(--color-accent)' : 'var(--color-text-subtle)',
                     }}>
-                      {seg.active ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
+                      {seg.active === 'true' ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
                     </button>
                   </td>
                 </tr>
@@ -463,11 +463,11 @@ const SegmentsPage: React.FC = () => {
             <tbody>
               {orgs.map(org => {
                 const segs = orgSegments[org.orgId] || [];
-                const activeNames = segs.filter(s => s.active !== false).map(s => s.segmentName);
+                const activeNames = segs.filter(s => s.active !== 'false').map(s => s.segmentName);
                 const integrations: string[] = [];
-                if (segs.some(s => s.channel === 'toast' && s.active)) integrations.push('Toast');
-                if (segs.some(s => s.channel === 'shopify' && s.active)) integrations.push('Shopify');
-                if (segs.some(s => s.channel === 'lodgify' && s.active)) integrations.push('Lodgify');
+                if (segs.some(s => s.channel === 'toast' && s.active === 'true')) integrations.push('Toast');
+                if (segs.some(s => s.channel === 'shopify' && s.active === 'true')) integrations.push('Shopify');
+                if (segs.some(s => s.channel === 'lodgify' && s.active === 'true')) integrations.push('Lodgify');
 
                 return (
                   <tr key={org.orgId}>
