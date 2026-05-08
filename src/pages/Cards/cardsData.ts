@@ -11,7 +11,7 @@ export const FALLBACK_BRAND_COLORS: BrandColors = {
 };
 
 export type FieldSource = 'agent-generated' | 'integration' | 'brand-settings' | 'partner-profile';
-export type CardSource = 'Shopify' | 'Network' | 'Skill';
+export type CardSource = 'Shopify' | 'Network' | 'Skill' | 'Navigation';
 
 export interface CardFieldDefinition {
   name: string;
@@ -48,6 +48,7 @@ export const CARD_SOURCE_COLORS: Record<CardSource, { bg: string; fg: string }> 
   Shopify: { bg: 'rgba(16,185,129,0.12)', fg: '#059669' },
   Network: { bg: 'rgba(245,158,11,0.12)', fg: '#d97706' },
   Skill: { bg: 'rgba(99,102,241,0.12)', fg: '#6366f1' },
+  Navigation: { bg: 'rgba(14,165,233,0.12)', fg: '#0ea5e9' },
 };
 
 export const CARD_DEFINITIONS: CardDefinition[] = [
@@ -119,6 +120,23 @@ export const CARD_DEFINITIONS: CardDefinition[] = [
       targetAgentName: 'Binta',
       targetDomain: 'binta.com',
       reason: 'Binta specializes in West African cuisine which matches what you\'re looking for',
+    },
+  },
+  {
+    id: 'external_navigation',
+    name: 'External Navigation',
+    description: 'Shows a confirmation card when the agent navigates to an offsite URL',
+    triggerHint: 'Fired by navigate_to_page when the destination is outside the brand\'s domain',
+    sourceBadge: 'Navigation',
+    fields: [
+      { name: 'url', mockValue: 'https://order.toasttab.com/online/local-culture-6-teranga', source: 'agent-generated' },
+      { name: 'title', mockValue: 'Order Online (Individual)', source: 'integration' },
+      { name: 'description', mockValue: 'Toast\'s direct online ordering page for individual pickup or delivery orders.', source: 'integration' },
+    ],
+    mockData: {
+      url: 'https://order.toasttab.com/online/local-culture-6-teranga',
+      title: 'Order Online (Individual)',
+      description: 'Toast\'s direct online ordering page for individual pickup or delivery orders. Pickup address is 601 Lexington Ave, Manhattan.',
     },
   },
   {

@@ -7,6 +7,7 @@ import NavigateCard from './NavigateCard';
 import AgentReferralCard from './AgentReferralCard';
 import InquiryFormCard from './InquiryFormCard';
 import BookingCard from './BookingCard';
+import ExternalNavigationCard from './ExternalNavigationCard';
 
 interface Props {
   card: CardDefinition | null;
@@ -24,6 +25,8 @@ function renderCard(card: CardDefinition, brandColors: BrandColors) {
       return <NavigateCard url={d.url as string} label={d.label as string} brandColors={brandColors} />;
     case 'agent_referral':
       return <AgentReferralCard targetAgentName={d.targetAgentName as string} targetDomain={d.targetDomain as string} reason={d.reason as string} brandColors={brandColors} />;
+    case 'external_navigation':
+      return <ExternalNavigationCard url={d.url as string} title={d.title as string} description={d.description as string} brandColors={brandColors} />;
     case 'inquiry_form':
       return <InquiryFormCard fields={d.fields as any[]} brandColors={brandColors} />;
     case 'booking_form':
