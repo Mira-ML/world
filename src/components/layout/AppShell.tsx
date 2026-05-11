@@ -30,7 +30,6 @@ const sectionSubTabs: Record<string, SubTab[]> = {
     { id: 'funnel', label: 'Funnel', path: '/playbook/funnel' },
   ],
   communications: [
-    { id: 'notifications', label: 'Notifications', path: '/communications' },
     { id: 'feedback', label: 'Feedback', path: '/communications/feedback' },
     { id: 'conversations', label: 'Conversations', path: '/communications/conversations' },
   ],
