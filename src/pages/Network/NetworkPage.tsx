@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useWorldData } from '../../contexts/WorldDataContext';
 
 /* ── Types ───────────────────────────────────────────────────── */
-interface GraphNode { id: string; label: string; agentName?: string; brandName?: string; uniqueUsers?: number; conversationsLast30d?: number; type: 'org' | 'agent'; }
+interface GraphNode { id: string; label: string; brandName?: string; uniqueUsers?: number; conversationsLast30d?: number; type: 'org' | 'agent'; }
 interface GraphEdge { source: string; target: string; referralCount: number; status?: string; direction: 'outbound' | 'inbound' | 'mutual'; }
 interface GraphData { nodes: GraphNode[]; edges: GraphEdge[]; }
 interface StatRow { fromOrg: string; toOrg: string; fromLabel: string; toLabel: string; referralCount: number; direction: string; }
@@ -229,21 +229,6 @@ const NetworkPage: React.FC = () => {
                     }}>
                       {node.brandName || node.label}
                     </div>
-                    {/* Agent name — secondary, only if different from brand */}
-                    {node.agentName && node.agentName !== (node.brandName || node.label) && (
-                      <div style={{
-                        fontSize: 9,
-                        color: 'var(--color-text-subtle)',
-                        textAlign: 'center',
-                        maxWidth: foWidth,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                        fontFamily: 'var(--font-primary)',
-                      }}>
-                        {node.agentName}
-                      </div>
-                    )}
                     {/* Stats line */}
                     {(node.uniqueUsers || node.conversationsLast30d) ? (
                       <div style={{
