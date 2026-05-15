@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth0 } from '@auth0/auth0-react';
-import { ChevronLeft, ChevronRight, ChevronDown, LogOut, Menu } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, LogOut } from 'lucide-react';
 import './AppShell.css';
 
 interface SubTab {
@@ -14,6 +14,7 @@ const NAV_ITEMS = [
   { to: '/', label: 'OVERVIEW', end: true },
   { to: '/clients', label: 'CLIENTS', end: false },
   { to: '/costs', label: 'COSTS', end: false },
+  { to: '/knowledge', label: 'KNOWLEDGE', end: false },
   { to: '/playbook', label: 'PLAYBOOK', end: false },
   { to: '/network', label: 'NETWORK', end: false },
   { to: '/communications', label: 'COMMUNICATIONS', end: false },

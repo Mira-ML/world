@@ -8,6 +8,7 @@ import AppShell from './components/layout/AppShell';
 import OverviewPage from './pages/Overview/OverviewPage';
 import ClientsPage from './pages/Clients/ClientsPage';
 import CostsPage from './pages/Costs/CostsPage';
+import KnowledgeGapsPage from './pages/Knowledge/KnowledgeGapsPage';
 import PromptsPage from './pages/Prompts/PromptsPage';
 import SegmentsPage from './pages/Playbook/SegmentsPage';
 import FunnelConfigPage from './pages/Playbook/FunnelConfigPage';
@@ -29,6 +30,7 @@ const App: React.FC = () => (
               <Route index element={<OverviewPage />} />
               <Route path="clients" element={<ClientsPage />} />
               <Route path="costs" element={<CostsPage />} />
+              <Route path="knowledge" element={<KnowledgeGapsPage />} />
               {/* Playbook section — sub-tabs: Prompts | Segments */}
               <Route path="playbook" element={<PromptsPage />} />
               <Route path="playbook/segments" element={<SegmentsPage />} />

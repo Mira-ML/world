@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useWorldData } from '../../contexts/WorldDataContext';
-import { Plus, X, Save, RefreshCw, ChevronDown, Info, ToggleLeft, ToggleRight, Trash2 } from 'lucide-react';
+import { Plus, X, Save, Info, ToggleLeft, ToggleRight } from 'lucide-react';
 
 /* ──────────────────────────── Types ──────────────────────────── */
 
